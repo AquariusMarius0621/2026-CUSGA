@@ -1,0 +1,27 @@
+﻿# relativePath|role
+Assets/Scenes/SampleScene.unity|当前唯一测试关卡，包含战场、路径、HUD、原型对象与场景装配
+Assets/Scripts/TowerDefense/TowerDefenseGame.cs|总控：资源、基地、自由放置、拖拽预览、建造判定
+Assets/Scripts/TowerDefense/TowerCatalog.cs|塔静态定义目录：统一提供成本、占地半径、展示名与部署卡文案数据
+Assets/Scripts/TowerDefense/TowerDefenseHudPresenter.cs|HUD 表现层适配器：负责界面查找、文本刷新、按钮状态与拖拽提示
+Assets/Scripts/TowerDefense/TowerShopCard.cs|部署卡拖拽入口，负责 UI 拖拽交互转发
+Assets/Scripts/TowerDefense/BuildZone.cs|自由放置的大范围许可区
+Assets/Scripts/TowerDefense/PlacementBlocker.cs|敌人路径、出生点、基地核心等禁建标记
+Assets/Scripts/TowerDefense/BuildPad.cs|旧固定塔位方案与 PlacedTower 兼容桥接，当前场景中已整体禁用
+Assets/Scripts/TowerDefense/DefenseTower.cs|基础攻击塔，扫描最近敌人并造成伤害
+Assets/Scripts/TowerDefense/RelayTower.cs|经济塔，周期性产出电量
+Assets/Scripts/TowerDefense/Enemy.cs|敌人移动、血量、死亡、抵达基地逻辑
+Assets/Scripts/TowerDefense/EnemyPath.cs|路径点容器与 Gizmo 绘制
+Assets/Scripts/TowerDefense/WaveSpawner.cs|波次配置与刷怪状态机
+Assets/Scripts/TowerDefense/SceneObjectFinder.cs|原型期按名字查找场景对象的辅助工具
+Packages/manifest.json|当前包依赖清单
+ProjectSettings/ProjectVersion.txt|Unity 版本锁定
+AGENTS.md|项目入口说明，负责告诉 AI 先读哪份记忆文档与本地 Skill
+docs/ai-memory/td-memory-main.md|主记忆文档：项目概况、文件索引、核心规则、游戏流程
+docs/ai-memory/td-memory-architecture.md|架构子文档：Scene 装配、HUD 结构、自由放置链路
+docs/ai-memory/td-memory-rules-and-history.md|规范子文档：已知问题、规范、历史、路线图
+docs/ai-memory/skills/read-memory-docs/SKILL.md|开工前读取记忆文档的本地 Skill
+docs/ai-memory/skills/update-memory-docs/SKILL.md|收工后同步记忆文档的本地 Skill
+docs/ai-memory/tools/refresh-memory-index.ps1|半自动刷新主记忆文档文件索引表的脚本
+docs/ai-memory/memory-index.paths.txt|主文档文件索引的源配置
+docs/ai-memory/templates/unity-memory-kit/START-HERE.md|可复用 Unity 记忆文档与本地 Skill 模板包入口
+

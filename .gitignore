@@ -1,0 +1,45 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Auto-generated IDE/project files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity / IDE caches
+.vs/
+.idea/
+
+# Editor-specific settings we usually don't want in a shared repo
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Plastic SCM local metadata
+.plastic/
+
+# Generated screenshots and helper scratch files
+Assets/Screenshots/
+*.codex_tmp
+*.tmp
+
+# Local Codex tooling
+.codex/
