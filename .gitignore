@@ -43,3 +43,9 @@ Assets/Screenshots/
 
 # Local Codex tooling
 .codex/
+
+# Local AI collaboration memory and helper tooling
+AGENTS.md
+docs/ai-memory/
+docs/github-collaborator-setup.md
+Packages/SkillsForUnity/
