@@ -49,3 +49,7 @@ AGENTS.md
 docs/ai-memory/
 docs/github-collaborator-setup.md
 Packages/SkillsForUnity/
+
+# Local / non-essential TextMesh Pro sample content
+Assets/TextMesh Pro/Documentation/
+Assets/TextMesh Pro/Examples & Extras/
