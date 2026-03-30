@@ -9,6 +9,10 @@ Unity 2022.3 的 2D 塔防原型项目。
 - `Packages/packages-lock.json`
 - `ProjectSettings/`
 
+协作规则见：
+
+- `CONTRIBUTING.md`
+
 以下内容不会上传到仓库：
 
 - 本地 AI 记忆文档
