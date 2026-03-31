@@ -27,6 +27,7 @@ public sealed class TowerDefinition
         string displayName,
         int buildCost,
         float placementRadius,
+        float expansionSquareSize,
         string cardRoleSummary,
         Color accentColor)
     {
@@ -34,6 +35,7 @@ public sealed class TowerDefinition
         DisplayName = displayName;
         BuildCost = buildCost;
         PlacementRadius = placementRadius;
+        ExpansionSquareSize = expansionSquareSize;
         CardRoleSummary = cardRoleSummary;
         AccentColor = accentColor;
     }
@@ -62,6 +64,18 @@ public sealed class TowerDefinition
     public float PlacementRadius { get; }
 
     /// <summary>
+    /// 这类塔在“部署网络扩张”里提供的方形范围边长。
+    ///
+    /// 这次玩法改动后，塔不只是一个占地物件，
+    /// 它还会把后续允许放塔的范围继续向外扩张。
+    ///
+    /// 这里直接记录“方形边长”，是为了让规则读起来更贴近设计语言：
+    /// 讨论时我们说的是“这座塔能往外扩多大一格”，
+    /// 而不是再把方形规则绕回圆形半径。
+    /// </summary>
+    public float ExpansionSquareSize { get; }
+
+    /// <summary>
     /// 部署卡第二行的功能摘要文案。
     /// </summary>
     public string CardRoleSummary { get; }
@@ -83,7 +97,7 @@ public sealed class TowerDefinition
         string accentHex = ColorUtility.ToHtmlStringRGB(AccentColor);
         return
             $"{DisplayName.ToUpperInvariant()}\n" +
-            $"<size=22><color=#9FB4C8>{CardRoleSummary}</color></size>\n" +
+            $"<size=20><color=#9FB4C8>{CardRoleSummary} • GRID {ExpansionSquareSize:0.0}</color></size>\n" +
             $"<size=32><color=#{accentHex}>{BuildCost} EN</color></size>";
     }
 }

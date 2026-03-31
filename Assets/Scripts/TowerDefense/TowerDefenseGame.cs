@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.EventSystems;
 
 /// <summary>
@@ -40,10 +41,22 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private float relayPlacementRadius = 0.52f;
     [SerializeField] private float defensePlacementRadius = 0.58f;
 
+    [Header("Placement Expansion")]
+    [SerializeField] private float relayExpansionSquareSize = 4.5f;
+    [SerializeField] private float defenseExpansionSquareSize = 4.5f;
+    [SerializeField] private Vector2 initialPlacementSquareCenter = new Vector2(-6.5f, -2.25f);
+    [SerializeField] private float initialPlacementSquareSize = 3f;
+
     [Header("Placement Preview")]
     [SerializeField] private Color validPreviewColor = new Color(0.26f, 0.95f, 0.78f, 0.72f);
     [SerializeField] private Color invalidPreviewColor = new Color(1f, 0.32f, 0.38f, 0.72f);
     [SerializeField] private string placementRingResourcePath = "UI/placement-ring";
+
+    [Header("Placement Overlay")]
+    [SerializeField] private float placementAreaOverlayPixelsPerUnit = 20f;
+    [SerializeField] private Color placementAreaOverlayFillColor = new Color(0.18f, 0.82f, 0.86f, 0.16f);
+    [SerializeField] private Color placementAreaOverlayEdgeColor = new Color(0.72f, 1f, 0.97f, 0.52f);
+    [SerializeField] private int placementAreaOverlaySortingOrder = 12;
 
     [Header("Scene Object Names")]
     [SerializeField] private string mainCameraName = "Main Camera";
@@ -89,6 +102,7 @@ public class TowerDefenseGame : MonoBehaviour
     private GameObject _placementPreviewInstance;
     private SpriteRenderer _placementPreviewSpriteRenderer;
     private SpriteRenderer _placementPreviewRingRenderer;
+    private PlacementAreaOverlayRenderer _placementAreaOverlayRenderer;
 
     /// <summary>
     /// `_towerCatalog` 缂佺喍绔寸€涙ɑ鏂侀崥鍕潚婵夋梻娈戦棃娆愨偓浣哥暰娑斿鈧?    ///
@@ -121,6 +135,28 @@ public class TowerDefenseGame : MonoBehaviour
         _currentEnergy = startingEnergy;
         _currentBaseHealth = startingBaseHealth;
         InitializeArchitectureModules();
+        _placementAreaOverlayRenderer = new PlacementAreaOverlayRenderer(
+            placementAreaOverlayPixelsPerUnit,
+            placementAreaOverlayFillColor,
+            placementAreaOverlayEdgeColor,
+            placementAreaOverlaySortingOrder);
+    }
+
+    /// <summary>
+    /// 释放运行时生成的覆盖图资源，并在总控销毁时清掉单例引用。
+    ///
+    /// 这一步很小，但它能避免：
+    /// - 运行时 Texture2D / Sprite 资源残留
+    /// - 旧场景退出后，静态单例还指向失效对象
+    /// </summary>
+    private void OnDestroy()
+    {
+        _placementAreaOverlayRenderer?.Dispose();
+
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 
     /// <summary>
@@ -135,11 +171,12 @@ public class TowerDefenseGame : MonoBehaviour
         EnsureRuntimeRoots();
         _hudPresenter.ConfigureCardLabels(_towerCatalog);
 
-        SetStatusMessage("拖拽右侧部署卡到地图中的非路径区域进行放置。快捷键 1 / 2 可快速选塔。");
+        SetStatusMessage("先在初始部署区放下第一座建筑；右侧可选发电机或炮塔，拖拽时会高亮精确合法区域。快捷键 1 / 2 可快速选中。");
         RefreshHud();
 
         _hudPresenter.SetGameOverVisible(false);
         _hudPresenter.SetDragPreviewVisible(false);
+        HidePlacementAreaOverlay();
     }
 
     /// <summary>
@@ -198,9 +235,10 @@ public class TowerDefenseGame : MonoBehaviour
 
         EnsurePlacementPreviewInstance(towerType);
         _hudPresenter.SetDragPreviewVisible(true);
+        RefreshPlacementAreaOverlay(towerType);
         RefreshHud();
         UpdatePlacementDrag(screenPosition);
-        SetStatusMessage("拖到地图空地区域后松手即可部署。");
+        SetStatusMessage("把发电机或炮塔拖到高亮的精确合法区域后松手即可部署。");
         return true;
     }
 
@@ -404,7 +442,7 @@ public class TowerDefenseGame : MonoBehaviour
         }
         else
         {
-            SetStatusMessage($"当前选中：{GetTowerDisplayName(towerType)}。点击地图或直接拖拽部署卡进行放置。");
+            SetStatusMessage($"当前选中：{GetTowerDisplayName(towerType)}。拖拽部署卡可查看该建筑的精确合法区域。");
         }
 
         RefreshHud();
@@ -420,16 +458,18 @@ public class TowerDefenseGame : MonoBehaviour
         _towerCatalog = new TowerCatalog(
             relayDefinition: new TowerDefinition(
                 towerType: TowerType.Relay,
-                displayName: "Relay Node",
+                displayName: "Relay Generator",
                 buildCost: relayTowerCost,
                 placementRadius: relayPlacementRadius,
-                cardRoleSummary: "Power Income / Support",
+                expansionSquareSize: relayExpansionSquareSize,
+                cardRoleSummary: "Generator / Power Income",
                 accentColor: new Color(1f, 0.55f, 0.22f, 1f)),
             defenseDefinition: new TowerDefinition(
                 towerType: TowerType.Defense,
                 displayName: "Defense Turret",
                 buildCost: defenseTowerCost,
                 placementRadius: defensePlacementRadius,
+                expansionSquareSize: defenseExpansionSquareSize,
                 cardRoleSummary: "Frontline Damage",
                 accentColor: new Color(0.28f, 0.78f, 1f, 1f)));
 
@@ -587,12 +627,22 @@ public class TowerDefenseGame : MonoBehaviour
             return false;
         }
 
+        // 第一层：仍然必须位于关卡许可的大建造区里。
+        // 这条规则保留下来，是为了防止部署网络一路扩到地图设计边界之外。
         if (!_buildZone.ContainsPoint(worldPosition))
         {
             invalidReason = "超出了当前关卡允许建造的范围。";
             return false;
         }
 
+        // 第二层：必须接在当前部署网络上。
+        // 没有塔时只能用初始小区域起手；有塔后就只能沿着已建塔的方形范围继续扩张。
+        if (!IsWithinPlacementNetwork(worldPosition, out invalidReason))
+        {
+            return false;
+        }
+
+        // 第三层：即使在部署网络内，也不能压到路径、出生点、基地等禁建区。
         float placementRadius = GetPlacementRadius(towerType);
         Collider2D[] overlaps = Physics2D.OverlapCircleAll(worldPosition, placementRadius);
         for (int i = 0; i < overlaps.Length; i++)
@@ -615,6 +665,8 @@ public class TowerDefenseGame : MonoBehaviour
                 return false;
             }
 
+            // 第四层：最后再做塔与塔之间的占地冲突检查。
+            // 这样玩家先看到“归不归当前部署网络管”，再看到“这里会不会和别的塔打架”。
             if (overlap.GetComponentInParent<DefenseTower>() != null || overlap.GetComponentInParent<RelayTower>() != null)
             {
                 invalidReason = "这个位置离其他塔太近了，请稍微挪开一些。";
@@ -658,7 +710,151 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
     /// <summary>
+    /// 根据塔类型返回它用于“部署网络扩张”的方形边长。
+    ///
+    /// 占地半径和扩张方格是两套不同规则：
+    /// - 占地半径回答“这座塔会不会和别的塔挤在一起”
+    /// - 扩张方格回答“下一座塔理论上能不能接着往外放”
+    ///
+    /// 把它们拆开后，后续调平衡时就能分别调：
+    /// 你可以让某种塔占地不大，但能把战线扩出去很远；
+    /// 也可以让某种塔本体很大，但扩张能力一般。
+    /// </summary>
+    private float GetExpansionSquareSize(TowerType towerType)
+    {
+        TowerDefinition definition = _towerCatalog != null ? _towerCatalog.GetDefinition(towerType) : null;
+        return definition != null ? definition.ExpansionSquareSize : 4.5f;
+    }
+
+    /// <summary>
+    /// 判定当前落点是否位于“部署网络”允许的区域里。
+    ///
+    /// 这次新规则的核心就收口在这里：
+    /// - 如果场上还没有塔，只能在初始小方区里放第一座
+    /// - 只要已经有塔存在，后续落点就必须位于任意一座已建塔提供的方形扩张区内
+    ///
+    /// 注意这里判断的是“新塔中心点”是否落入允许区，
+    /// 而不是要求整座塔的占地圆完整包在方格里。
+    /// 这样更贴近拖拽放置时的玩家直觉。
+    /// </summary>
+    private bool IsWithinPlacementNetwork(Vector3 worldPosition, out string invalidReason)
+    {
+        invalidReason = string.Empty;
+
+        if (_placedTowerRoot == null || _placedTowerRoot.childCount == 0)
+        {
+            if (IsInsideSquare(worldPosition, initialPlacementSquareCenter, initialPlacementSquareSize))
+            {
+                return true;
+            }
+
+            invalidReason = "首座塔必须先放在初始部署区内。";
+            return false;
+        }
+
+        for (int i = 0; i < _placedTowerRoot.childCount; i++)
+        {
+            Transform placedTower = _placedTowerRoot.GetChild(i);
+            if (placedTower == null || !placedTower.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (!TryGetPlacedTowerType(placedTower, out TowerType placedTowerType))
+            {
+                continue;
+            }
+
+            if (IsInsideSquare(worldPosition, placedTower.position, GetExpansionSquareSize(placedTowerType)))
+            {
+                return true;
+            }
+        }
+
+        invalidReason = "新的塔必须放在已建塔的方形扩张范围内。";
+        return false;
+    }
+
+    /// <summary>
+    /// 用一个很轻量的方式识别“这座已建塔属于哪种塔类型”。
+    ///
+    /// 这里没有再引入新的注册表或额外资产，
+    /// 是因为当前原型只有两种塔，直接看组件已经足够稳定，
+    /// 也能避免为了一个简单规则把系统复杂度再抬高一层。
+    /// </summary>
+    private bool TryGetPlacedTowerType(Transform placedTower, out TowerType towerType)
+    {
+        if (placedTower == null)
+        {
+            towerType = TowerType.None;
+            return false;
+        }
+
+        if (placedTower.GetComponent<RelayTower>() != null)
+        {
+            towerType = TowerType.Relay;
+            return true;
+        }
+
+        if (placedTower.GetComponent<DefenseTower>() != null)
+        {
+            towerType = TowerType.Defense;
+            return true;
+        }
+
+        towerType = TowerType.None;
+        return false;
+    }
+
+    /// <summary>
+    /// 判断某个世界坐标点是否落在以指定中心为基准的方形区域内。
+    ///
+    /// 这里使用的是轴对齐正方形判定：
+    /// 只要 X 和 Y 到中心的距离都不超过半边长，就视为处于该区域中。
+    /// 这种写法比额外创建检测碰撞体更轻，也更适合当前原型期规则验证。
+    /// </summary>
+    private bool IsInsideSquare(Vector3 worldPosition, Vector2 squareCenter, float squareSize)
+    {
+        float halfSize = Mathf.Max(0f, squareSize) * 0.5f;
+        return Mathf.Abs(worldPosition.x - squareCenter.x) <= halfSize
+            && Mathf.Abs(worldPosition.y - squareCenter.y) <= halfSize;
+    }
+
+    /// <summary>
     /// 娴犲骸缍嬮崜宥夌炊閺嶅洤鐫嗛獮鏇炴綏閺嶅洩顓哥粻妤佸灛閸﹁桨鑵戦惃鍕瑯閻ｅ苯娼楅弽鍥モ偓?    /// </summary>
+    /// <summary>
+    /// 根据当前拖拽的塔类型，重新生成一张“精确合法区域”覆盖图。
+    ///
+    /// 这里故意不复制第二套几何规则，
+    /// 而是直接重放真实的 `ValidatePlacementPosition` 判定。
+    /// 这样能保证：
+    /// 玩家在地图上看到的青色高亮区域，和真正能放下去的中心点区域保持一致。
+    /// </summary>
+    private void RefreshPlacementAreaOverlay(TowerType towerType)
+    {
+        if (_placementAreaOverlayRenderer == null || !_isPlacementDragActive || towerType == TowerType.None || _buildZone == null || _placementPreviewRoot == null)
+        {
+            HidePlacementAreaOverlay();
+            return;
+        }
+
+        _placementAreaOverlayRenderer.Show(
+            _placementPreviewRoot,
+            _buildZone.WorldBounds,
+            worldPosition => ValidatePlacementPosition(worldPosition, towerType, out _));
+    }
+
+    /// <summary>
+    /// 隐藏当前合法区域覆盖图。
+    ///
+    /// 之所以把这个动作单独抽出来，
+    /// 是为了让“拖拽结束 / 取消 / GameOver”这些出口都能走同一条清理路径。
+    /// </summary>
+    private void HidePlacementAreaOverlay()
+    {
+        _placementAreaOverlayRenderer?.Hide();
+    }
+
     private Vector3 GetMouseWorldPosition()
     {
         return ScreenToWorldPosition(Input.mousePosition);
@@ -791,6 +987,7 @@ public class TowerDefenseGame : MonoBehaviour
         _previewPositionIsValid = false;
         _previewInvalidReason = string.Empty;
         _hudPresenter.SetDragPreviewVisible(false);
+        HidePlacementAreaOverlay();
         DestroyPlacementPreview();
     }
 
@@ -892,3 +1089,219 @@ public class TowerDefenseGame : MonoBehaviour
     }
 }
 
+/// <summary>
+/// PlacementAreaOverlayRenderer 璐熻矗鎶娾€滃綋鍓嶅绫诲瀷鐪熸鍏佽钀戒腑蹇冪偣鐨勪綅缃€濈粯鍒舵垚涓€寮犱笘鐣岀┖闂磋鐩栧浘銆?///
+/// 涓轰粈涔堣繖閲屼笉鍐嶆墜鍐欎竴濂楀崟鐙殑鍑犱綍鍙鍖栬鍒欙紵
+/// 鍥犱负褰撳墠鐪熷疄鏀剧疆鍒ゅ畾宸茬粡鍚屾椂渚濊禆锛?/// - BuildZone
+/// - 鍒濆閮ㄧ讲鍖?/ 宸插缓濉旈儴缃茬綉缁?/// - PlacementBlocker
+/// - 宸叉湁濉斿崰鍦扮鎾?///
+/// 濡傛灉瑕嗙洊灞傝嚜宸卞啀澶嶅埗涓€濂楄鍒欙紝
+/// 寰堝鏄撳嚭鐜扳€滅敾鍑烘潵鑳芥斁锛屼絾鐪熸鐐逛笅鍘诲嵈涓嶈兘鏀锯€濈殑淇℃伅鍒嗗弶銆?///
+/// 鎵€浠ヨ繖閲岄噰鐢ㄤ竴涓洿绋崇殑鍋氭硶锛?/// 鐩存帴鎸変竴瀹氬垎杈ㄧ巼閲嶆斁鐪熷疄鍒ゅ畾鍑芥暟锛?/// 鎶婃瘡涓噰鏍风偣鏄笉鏄悎娉曪紝鐑樻垚涓€寮犲甫杈圭紭楂樹寒鐨勮创鍥俱€?///
+/// 杩欑鏂规涓嶆槸鏈€鏁板鍖栫殑瑙ｆ瀽瑁佸壀锛?/// 浣嗗畠鏈€澶х殑浠峰€兼槸锛?/// 鍙鍖栧拰鐪熷疄鐜╂硶姘歌繙鏉ヨ嚜鍚屼竴濂楀垽鏂€昏緫銆?/// 瀵瑰綋鍓嶅師鍨嬫湡椤圭洰鏉ヨ锛岃繖鏄潪甯稿垝绠楃殑鎶樹腑銆?/// </summary>
+public sealed class PlacementAreaOverlayRenderer : IDisposable
+{
+    private readonly float _pixelsPerUnit;
+    private readonly Color _fillColor;
+    private readonly Color _edgeColor;
+    private readonly int _sortingOrder;
+
+    private GameObject _overlayObject;
+    private SpriteRenderer _spriteRenderer;
+    private Texture2D _overlayTexture;
+    private Sprite _overlaySprite;
+
+    public PlacementAreaOverlayRenderer(float pixelsPerUnit, Color fillColor, Color edgeColor, int sortingOrder)
+    {
+        _pixelsPerUnit = Mathf.Max(4f, pixelsPerUnit);
+        _fillColor = fillColor;
+        _edgeColor = edgeColor;
+        _sortingOrder = sortingOrder;
+    }
+
+    /// <summary>
+    /// 閲嶆柊鐢熸垚骞舵樉绀哄綋鍓嶈鐩栧浘銆?    ///
+    /// 鍙鐖惰妭鐐广€佽寖鍥存垨鍒ゅ畾鍑芥暟鏃犳晥锛屽氨鐩存帴闅愯棌锛?    /// 閬垮厤鍦ㄥ満鏅皻鏈閰嶅畬鏁存椂鐢熸垚涓€寮犳病鏈夋剰涔夌殑绌哄浘銆?    /// </summary>
+    public void Show(Transform parent, Bounds worldBounds, Func<Vector3, bool> validator)
+    {
+        if (parent == null || validator == null || worldBounds.size.x <= Mathf.Epsilon || worldBounds.size.y <= Mathf.Epsilon)
+        {
+            Hide();
+            return;
+        }
+
+        EnsureOverlayObject(parent);
+        RebuildOverlayTexture(worldBounds, validator);
+
+        if (_overlayObject != null)
+        {
+            _overlayObject.transform.position = new Vector3(worldBounds.center.x, worldBounds.center.y, 0f);
+            _overlayObject.transform.localScale = Vector3.one;
+            _overlayObject.SetActive(true);
+        }
+    }
+
+    /// <summary>
+    /// 浠呴殣钘忚鐩栧浘锛屼絾淇濈暀瀵硅薄鍜屼笂涓€杞汗鐞嗭紝
+    /// 杩欐牱涓嬩竴娆￠噸鏂版樉绀烘椂鍙渶瑕侀噸寤哄綋鍓嶅悎娉曞尯鍗冲彲銆?    /// </summary>
+    public void Hide()
+    {
+        if (_overlayObject != null)
+        {
+            _overlayObject.SetActive(false);
+        }
+    }
+
+    /// <summary>
+    /// 閲婃斁杩愯鏃剁敓鎴愮殑璐村浘鍜屾壙杞藉璞°€?    /// </summary>
+    public void Dispose()
+    {
+        DestroyTextureResources();
+
+        if (_overlayObject != null)
+        {
+            UnityEngine.Object.Destroy(_overlayObject);
+            _overlayObject = null;
+            _spriteRenderer = null;
+        }
+    }
+
+    /// <summary>
+    /// 纭繚瑕嗙洊鍥炬壙杞藉璞″瓨鍦紝骞舵寕鍒板綋鍓嶉瑙堟牴鑺傜偣涓嬨€?    /// </summary>
+    private void EnsureOverlayObject(Transform parent)
+    {
+        if (_overlayObject == null)
+        {
+            _overlayObject = new GameObject("PlacementAreaOverlay");
+            _overlayObject.transform.SetParent(parent, false);
+
+            _spriteRenderer = _overlayObject.AddComponent<SpriteRenderer>();
+            _spriteRenderer.sortingOrder = _sortingOrder;
+            _spriteRenderer.color = Color.white;
+        }
+        else if (_overlayObject.transform.parent != parent)
+        {
+            _overlayObject.transform.SetParent(parent, false);
+        }
+    }
+
+    /// <summary>
+    /// 鎸夊綋鍓嶅悎娉曟€у垽瀹氾紝鎶婂厑璁稿尯鍩熼噸鏂扮儤鎴愯创鍥俱€?    ///
+    /// 娴佺▼鍒嗕袱姝ワ細
+    /// 1. 鍏堥€愮偣閲囨牱锛屽緱鍒版瘡涓儚绱犱腑蹇冪偣鏄惁鍚堟硶銆?    /// 2. 鍐嶆牴鎹偦灞呭叧绯诲垽鏂摢浜涘悎娉曞儚绱犲鍦ㄨ竟缂橈紝鐢ㄦ洿浜殑棰滆壊鎻忓嚭鏉ャ€?    ///
+    /// 杩欐牱鐜╁鏃㈣兘鐪嬪埌鏁寸墖鍚堟硶鍖哄煙鐨勪綋绉紝
+    /// 涔熻兘鏇村鏄撹鍑鸿竟鐣岃疆寤撱€?    /// </summary>
+    private void RebuildOverlayTexture(Bounds worldBounds, Func<Vector3, bool> validator)
+    {
+        int width = Mathf.Clamp(Mathf.CeilToInt(worldBounds.size.x * _pixelsPerUnit), 32, 1024);
+        int height = Mathf.Clamp(Mathf.CeilToInt(worldBounds.size.y * _pixelsPerUnit), 32, 1024);
+
+        bool[] legalMask = new bool[width * height];
+        Color[] pixels = new Color[width * height];
+
+        Vector3 min = worldBounds.min;
+        float stepX = worldBounds.size.x / width;
+        float stepY = worldBounds.size.y / height;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Vector3 samplePoint = new Vector3(
+                    min.x + (x + 0.5f) * stepX,
+                    min.y + (y + 0.5f) * stepY,
+                    0f);
+
+                legalMask[(y * width) + x] = validator(samplePoint);
+            }
+        }
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int index = (y * width) + x;
+                if (!legalMask[index])
+                {
+                    pixels[index] = Color.clear;
+                    continue;
+                }
+
+                pixels[index] = HasIllegalNeighbour(legalMask, width, height, x, y)
+                    ? _edgeColor
+                    : _fillColor;
+            }
+        }
+
+        DestroyTextureResources();
+
+        _overlayTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        _overlayTexture.wrapMode = TextureWrapMode.Clamp;
+        _overlayTexture.filterMode = FilterMode.Point;
+        _overlayTexture.SetPixels(pixels);
+        _overlayTexture.Apply(false, false);
+
+        float spritePixelsPerUnit = width / worldBounds.size.x;
+        _overlaySprite = Sprite.Create(
+            _overlayTexture,
+            new Rect(0f, 0f, width, height),
+            new Vector2(0.5f, 0.5f),
+            spritePixelsPerUnit,
+            0,
+            SpriteMeshType.FullRect);
+
+        if (_spriteRenderer != null)
+        {
+            _spriteRenderer.sprite = _overlaySprite;
+        }
+    }
+
+    /// <summary>
+    /// 鍒ゆ柇涓€涓悎娉曞儚绱犲懆鍥存槸鍚︽尐鐫€闈炴硶鍖哄煙銆?    ///
+    /// 鍙鐩搁偦鍏牸閲屾湁浠绘剰涓€鏍奸潪娉曪紝
+    /// 灏辨妸褰撳墠鍍忕礌褰撲綔杈圭紭锛岀敤鏇翠寒鐨勯鑹叉樉绀恒€?    /// </summary>
+    private static bool HasIllegalNeighbour(bool[] legalMask, int width, int height, int x, int y)
+    {
+        for (int offsetY = -1; offsetY <= 1; offsetY++)
+        {
+            for (int offsetX = -1; offsetX <= 1; offsetX++)
+            {
+                if (offsetX == 0 && offsetY == 0)
+                {
+                    continue;
+                }
+
+                int neighbourX = x + offsetX;
+                int neighbourY = y + offsetY;
+                if (neighbourX < 0 || neighbourX >= width || neighbourY < 0 || neighbourY >= height)
+                {
+                    return true;
+                }
+
+                if (!legalMask[(neighbourY * width) + neighbourX])
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 閿€姣佷笂涓€杞繍琛屾椂鐢熸垚鐨勭汗鐞嗗拰 Sprite锛岄伩鍏嶅唴瀛樹竴鐩寸疮绉€?    /// </summary>
+    private void DestroyTextureResources()
+    {
+        if (_overlaySprite != null)
+        {
+            UnityEngine.Object.Destroy(_overlaySprite);
+            _overlaySprite = null;
+        }
+
+        if (_overlayTexture != null)
+        {
+            UnityEngine.Object.Destroy(_overlayTexture);
+            _overlayTexture = null;
+        }
+    }
+}

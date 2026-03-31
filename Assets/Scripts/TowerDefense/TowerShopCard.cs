@@ -53,7 +53,7 @@ public class TowerShopCard : MonoBehaviour,
     /// 这条提示不属于核心规则本身，
     /// 但它能显著降低第一次试玩时的理解门槛。
     /// </summary>
-    [SerializeField] private string hoverHint = "拖拽这张部署卡到地图的非路径区域进行放置。";
+    [SerializeField] private string hoverHint = "拖拽卡片时会显示当前塔的精确可部署区域；首塔先从初始部署区起手。";
 
     [Header("Drag Feedback")]
 
