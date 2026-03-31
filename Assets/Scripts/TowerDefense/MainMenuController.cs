@@ -383,7 +383,9 @@ public sealed class MainMenuController : MonoBehaviour
             mainCanvas = canvasObject.AddComponent<Canvas>();
         }
 
-        mainCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        mainCanvas.renderMode = RenderMode.ScreenSpaceCamera;
+        mainCanvas.worldCamera = sceneCamera;
+        mainCanvas.planeDistance = 10f;
 
         canvasScaler = mainCanvas.GetComponent<CanvasScaler>();
         if (canvasScaler == null)

@@ -18,7 +18,7 @@ Goal: 用更好读的方式讲清楚当前项目由哪些场景、脚本、UI、
 ## 2. 项目最重要的两个场景
 ### `Assets/Scenes/MainMenu.unity`
 这是主页面场景。
-你打开它时，`MainMenuController` 会在编辑器里把默认 UI 骨架补齐到场景中，所以你可以直接在 Scene 和 Inspector 里调标题、按钮、说明文字、布局等内容。
+你打开它时，`MainMenuController` 会在编辑器里把默认 UI 骨架补齐到场景中，所以你可以直接在 Scene 和 Inspector 里调标题、按钮、说明文字、布局等内容。当前菜单 Canvas 也已切到 `Screen Space Camera`，在 Scene 里观察和拖动会更直观。
 
 它的主要作用只有一个：
 - 作为游戏入口，点击开始进入 `SampleScene`
@@ -77,6 +77,11 @@ Goal: 用更好读的方式讲清楚当前项目由哪些场景、脚本、UI、
 - 更新拖拽提示面板
 - 运行时美化 HUD
 - 运行时显式修正布局，避免重叠
+
+现在玩法 HUD 的推荐维护方式是：
+- 布局、位置、大小、颜色：优先直接改 `SampleScene` 里的真实 UI 对象
+- 资源数值、波次、状态提示：仍由脚本动态刷新
+- 按钮不可用时的过渡色：优先在 Button 自己的 Transition / ColorBlock 里改
 
 如果你想改：
 - 顶部资源区样式
