@@ -161,6 +161,51 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
+    /// 由外部把已经在 Inspector 中拖好的 HUD 引用直接注入进来。
+    ///
+    /// 这一步是当前项目从“按名字查找场景对象”逐步迁移到“显式 Inspector 引用”的第一步：
+    /// - 如果场景作者已经把引用拖好，HUDPresenter 就直接使用这些确定的对象
+    /// - 如果某些引用暂时还没拖，后面 FindSceneReferences() 仍然会继续补走名字查找兜底
+    ///
+    /// 这样做的好处是迁移可以分阶段进行：
+    /// 我们不需要一次性把所有场景都重做完，
+    /// 但新补好的场景引用已经能立刻摆脱“改名就炸”的脆弱模式。
+    /// </summary>
+    public void BindSceneReferences(
+        TMP_Text energyText,
+        TMP_Text baseHealthText,
+        TMP_Text waveText,
+        TMP_Text selectionText,
+        TMP_Text statusText,
+        Button relayTowerButton,
+        Button defenseTowerButton,
+        Button clearSelectionButton,
+        GameObject gameOverPanel,
+        TMP_Text gameOverTitle,
+        TMP_Text gameOverHint,
+        GameObject dragPreviewPanel,
+        TMP_Text dragPreviewLabel)
+    {
+        _energyText = energyText;
+        _baseHealthText = baseHealthText;
+        _waveText = waveText;
+        _selectionText = selectionText;
+        _statusText = statusText;
+        _relayTowerButton = relayTowerButton;
+        _defenseTowerButton = defenseTowerButton;
+        _clearSelectionButton = clearSelectionButton;
+        _gameOverPanel = gameOverPanel;
+        _gameOverTitle = gameOverTitle;
+        _gameOverHint = gameOverHint;
+        _dragPreviewPanel = dragPreviewPanel;
+        _dragPreviewLabel = dragPreviewLabel;
+
+        _relayTowerButtonText = _relayTowerButton != null ? _relayTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
+        _defenseTowerButtonText = _defenseTowerButton != null ? _defenseTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
+        _clearSelectionButtonText = _clearSelectionButton != null ? _clearSelectionButton.GetComponentInChildren<TMP_Text>(true) : null;
+    }
+
+    /// <summary>
     /// 按当前项目仍在使用的对象名约定，把 HUD 相关引用找齐。
     ///
     /// 这一层仍然使用名字查找，
@@ -171,24 +216,47 @@ public sealed class TowerDefenseHudPresenter
     /// </summary>
     public void FindSceneReferences()
     {
-        _energyText = SceneObjectFinder.FindComponent<TMP_Text>(_energyTextName);
-        _baseHealthText = SceneObjectFinder.FindComponent<TMP_Text>(_baseHealthTextName);
-        _waveText = SceneObjectFinder.FindComponent<TMP_Text>(_waveTextName);
-        _selectionText = SceneObjectFinder.FindComponent<TMP_Text>(_selectionTextName);
-        _statusText = SceneObjectFinder.FindComponent<TMP_Text>(_statusTextName);
-        _gameOverTitle = SceneObjectFinder.FindComponent<TMP_Text>(_gameOverTitleName);
-        _gameOverHint = SceneObjectFinder.FindComponent<TMP_Text>(_gameOverHintName);
-        _dragPreviewLabel = SceneObjectFinder.FindComponent<TMP_Text>(_dragPreviewLabelName);
+        // 这一轮开始，HUD 主链不再主动按名字回捞场景对象。
+        // 对当前 SampleScene 而言，核心 HUD 节点都应当已经通过外部显式绑定传进来。
+        // 所以这里现在只做两件事：
+        // 1. 补齐按钮内部的子文本缓存
+        // 2. 对缺失引用给出明确告警，帮助场景装配尽快暴露问题
+        if (_relayTowerButtonText == null && _relayTowerButton != null)
+        {
+            _relayTowerButtonText = _relayTowerButton.GetComponentInChildren<TMP_Text>(true);
+        }
 
-        _relayTowerButton = SceneObjectFinder.FindComponent<Button>(_relayTowerButtonName);
-        _defenseTowerButton = SceneObjectFinder.FindComponent<Button>(_defenseTowerButtonName);
-        _clearSelectionButton = SceneObjectFinder.FindComponent<Button>(_clearSelectionButtonName);
-        _gameOverPanel = SceneObjectFinder.FindGameObject(_gameOverPanelName);
-        _dragPreviewPanel = SceneObjectFinder.FindGameObject(_dragPreviewPanelName);
+        if (_defenseTowerButtonText == null && _defenseTowerButton != null)
+        {
+            _defenseTowerButtonText = _defenseTowerButton.GetComponentInChildren<TMP_Text>(true);
+        }
 
-        _relayTowerButtonText = _relayTowerButton != null ? _relayTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
-        _defenseTowerButtonText = _defenseTowerButton != null ? _defenseTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
-        _clearSelectionButtonText = _clearSelectionButton != null ? _clearSelectionButton.GetComponentInChildren<TMP_Text>(true) : null;
+        if (_clearSelectionButtonText == null && _clearSelectionButton != null)
+        {
+            _clearSelectionButtonText = _clearSelectionButton.GetComponentInChildren<TMP_Text>(true);
+        }
+
+        WarnIfMissing(_energyText, _energyTextName);
+        WarnIfMissing(_baseHealthText, _baseHealthTextName);
+        WarnIfMissing(_waveText, _waveTextName);
+        WarnIfMissing(_selectionText, _selectionTextName);
+        WarnIfMissing(_statusText, _statusTextName);
+        WarnIfMissing(_relayTowerButton, _relayTowerButtonName);
+        WarnIfMissing(_defenseTowerButton, _defenseTowerButtonName);
+        WarnIfMissing(_clearSelectionButton, _clearSelectionButtonName);
+        WarnIfMissing(_gameOverPanel, _gameOverPanelName);
+        WarnIfMissing(_gameOverTitle, _gameOverTitleName);
+        WarnIfMissing(_gameOverHint, _gameOverHintName);
+        WarnIfMissing(_dragPreviewPanel, _dragPreviewPanelName);
+        WarnIfMissing(_dragPreviewLabel, _dragPreviewLabelName);
+    }
+
+    private static void WarnIfMissing(UnityEngine.Object reference, string expectedName)
+    {
+        if (reference == null)
+        {
+            Debug.LogWarning($"TowerDefenseHudPresenter is missing HUD reference: {expectedName}. Check the scene wiring.");
+        }
     }
 
     /// <summary>

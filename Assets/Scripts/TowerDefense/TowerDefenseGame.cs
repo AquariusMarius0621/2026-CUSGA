@@ -1,6 +1,8 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 /// <summary>
 /// 鐢ㄦ灇涓捐〃杈锯€滃綋鍓嶅噯澶囬儴缃插摢绉嶅鈥濄€?///
@@ -58,10 +60,26 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private Color placementAreaOverlayEdgeColor = new Color(0.72f, 1f, 0.97f, 0.52f);
     [SerializeField] private int placementAreaOverlaySortingOrder = 12;
 
+    [Header("Scene References (Preferred)")]
+
+    /// <summary>
+    /// 这些字段是第一阶段迁移里新增的“显式场景引用”。
+    ///
+    /// 推荐工作流已经从“靠对象名去找”转向“在 Inspector 里直接拖引用”：
+    /// - 这样改名不会悄悄把运行时依赖弄断
+    /// - 也能让后来维护的人直接从 Inspector 看出这个总控到底依赖哪些对象
+    ///
+    /// 这一阶段仍然保留名字查找字段，作为旧场景和未补齐引用时的兜底。
+    /// 等现有场景都补稳后，再进一步删除 fallback。
+    /// </summary>
+    [SerializeField] private Camera mainCameraReference;
+    [SerializeField] private GameObject relayTowerPrototypeReference;
+    [SerializeField] private GameObject defenseTowerPrototypeReference;
+    [SerializeField] private Transform placedTowerRootReference;
+    [SerializeField] private Transform placementPreviewRootReference;
+    [SerializeField] private BuildZone buildZoneReference;
+
     [Header("Scene Object Names")]
-    [SerializeField] private string mainCameraName = "Main Camera";
-    [SerializeField] private string relayTowerPrototypeName = "RelayTowerPrototype";
-    [SerializeField] private string defenseTowerPrototypeName = "DefenseTowerPrototype";
     [SerializeField] private string placedTowerRootName = "PlacedTowers";
     [SerializeField] private string placementPreviewRootName = "PlacementPreviewRoot";
     [SerializeField] private string buildZoneName = "BuildZone";
@@ -80,6 +98,30 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private string gameOverHintName = "GameOverHint";
     [SerializeField] private string dragPreviewPanelName = "DragPreviewPanel";
     [SerializeField] private string dragPreviewLabelName = "DragPreviewLabel";
+
+    [Header("HUD References (Preferred)")]
+
+    /// <summary>
+    /// 这一组字段把 HUD 依赖也纳入第一阶段迁移范围。
+    ///
+    /// 这里的目标不是一下子彻底删光名字查找，
+    /// 而是先把最核心、最容易因为改名而炸掉的 UI 依赖显式化：
+    /// 以后维护者只看 `TowerDefenseGame` 的 Inspector，
+    /// 就能知道 HUD 主链到底依赖了哪些文本、按钮和面板。
+    /// </summary>
+    [SerializeField] private TMP_Text energyTextReference;
+    [SerializeField] private TMP_Text baseHealthTextReference;
+    [SerializeField] private TMP_Text waveTextReference;
+    [SerializeField] private TMP_Text selectionTextReference;
+    [SerializeField] private TMP_Text statusTextReference;
+    [SerializeField] private Button relayTowerButtonReference;
+    [SerializeField] private Button defenseTowerButtonReference;
+    [SerializeField] private Button clearSelectionButtonReference;
+    [SerializeField] private GameObject gameOverPanelReference;
+    [SerializeField] private TMP_Text gameOverTitleReference;
+    [SerializeField] private TMP_Text gameOverHintReference;
+    [SerializeField] private GameObject dragPreviewPanelReference;
+    [SerializeField] private TMP_Text dragPreviewLabelReference;
 
     private int _currentEnergy;
     private int _currentBaseHealth;
@@ -1332,37 +1374,85 @@ public class TowerDefenseGame : MonoBehaviour
     /// 閸ョ姳璐熸潻娆愵偧閺嬭埖鐎銉ょ稊閸欘亝鍏傞幏鍡氫捍鐠愶綇绱濇稉宥嗗厒閸氬本妞傞弴瀛樺床鐟佸懘鍘ら弬鐟扮础閵?    /// </summary>
     private void FindSceneReferences()
     {
-        _mainCamera = SceneObjectFinder.FindComponent<Camera>(mainCameraName);
-        if (_mainCamera == null)
-        {
-            _mainCamera = Camera.main;
-        }
+        // 这一轮继续把主玩法链路从“按名字找对象”迁到“显式场景装配”。
+        // 对当前 SampleScene 来说，这些核心依赖都应该已经在 Inspector 中拖好：
+        // - 相机
+        // - 两种塔原型
+        // - BuildZone
+        //
+        // 这里不再让 SceneObjectFinder 为这些主链依赖兜底，
+        // 是为了尽快暴露场景装配问题，让依赖关系真正可见。
+        _mainCamera = mainCameraReference != null ? mainCameraReference : Camera.main;
+        _relayTowerPrototype = relayTowerPrototypeReference;
+        _defenseTowerPrototype = defenseTowerPrototypeReference;
 
-        _relayTowerPrototype = SceneObjectFinder.FindGameObject(relayTowerPrototypeName);
-        _defenseTowerPrototype = SceneObjectFinder.FindGameObject(defenseTowerPrototypeName);
+        _hudPresenter?.BindSceneReferences(
+            energyText: energyTextReference,
+            baseHealthText: baseHealthTextReference,
+            waveText: waveTextReference,
+            selectionText: selectionTextReference,
+            statusText: statusTextReference,
+            relayTowerButton: relayTowerButtonReference,
+            defenseTowerButton: defenseTowerButtonReference,
+            clearSelectionButton: clearSelectionButtonReference,
+            gameOverPanel: gameOverPanelReference,
+            gameOverTitle: gameOverTitleReference,
+            gameOverHint: gameOverHintReference,
+            dragPreviewPanel: dragPreviewPanelReference,
+            dragPreviewLabel: dragPreviewLabelReference);
 
         _hudPresenter?.FindSceneReferences();
         _buildZone = EnsureBuildZoneExists();
+
+        if (_mainCamera == null)
+        {
+            Debug.LogWarning("TowerDefenseGame is missing Main Camera reference. Camera.main fallback also failed.");
+        }
+
+        if (_relayTowerPrototype == null || _defenseTowerPrototype == null)
+        {
+            Debug.LogWarning("TowerDefenseGame is missing one or more tower prototype references. Check the scene wiring.");
+        }
     }
 
-    /// <summary>
-    /// 绾喕绻氭潻鎰攽閺冨墎鏁ら崚鎵畱閺嶇濡悙鐟扮摠閸︺劊鈧?    /// </summary>
     private void EnsureRuntimeRoots()
     {
-        _placedTowerRoot = SceneObjectFinder.FindOrCreateTransform(placedTowerRootName);
-        _placementPreviewRoot = SceneObjectFinder.FindOrCreateTransform(placementPreviewRootName);
+        _placedTowerRoot = EnsureRuntimeRoot(placedTowerRootReference, placedTowerRootName);
+        _placementPreviewRoot = EnsureRuntimeRoot(placementPreviewRootReference, placementPreviewRootName);
+
+        placedTowerRootReference = _placedTowerRoot;
+        placementPreviewRootReference = _placementPreviewRoot;
     }
 
     /// <summary>
-    /// 绾喕绻?BuildZone 鐎涙ê婀妴?    ///
-    /// 濮濓絽鐖堕幆鍛枌娑撳鐣犳惔鏃囶嚉閺勵垰婧€閺咁垶鍣烽弰搴ｂ€橀幗鍡樻杹婵傜晫娈戠€电钖勯敍?    /// 鏉╂瑩鍣锋０婵嗩樆閹绘劒绶垫稉鈧稉顏囩箥鐞涘本妞傞崗婊冪俺閸掓稑缂撻敍灞炬Ц娑撹桨绨￠柆鍨帳娴ｇ姴婀崢鐔风€烽梼鑸殿唽閸ョ姳璐熷蹇旀啘鐎电钖勯懓宀€娲块幒銉ュ幢濮濈粯绁︾粙瀣ㄢ偓?    /// </summary>
+    /// 确保某个运行时根节点存在。
+    ///
+    /// 这里和“按名字查找场景对象”不是一回事：
+    /// - 它不会全场搜索某个旧对象名
+    /// - 只会在显式引用为空时，创建一个新的干净根节点
+    ///
+    /// 这样保留了运行时容器的便利性，
+    /// 但不再把主链装配建立在隐式名称约定之上。
+    /// </summary>
+    private static Transform EnsureRuntimeRoot(Transform existingReference, string objectName)
+    {
+        if (existingReference != null)
+        {
+            return existingReference;
+        }
+
+        GameObject runtimeRoot = new GameObject(objectName);
+        return runtimeRoot.transform;
+    }
+
     private BuildZone EnsureBuildZoneExists()
     {
-        BuildZone buildZone = SceneObjectFinder.FindComponent<BuildZone>(buildZoneName);
-        if (buildZone != null)
+        if (buildZoneReference != null)
         {
-            return buildZone;
+            return buildZoneReference;
         }
+
+        Debug.LogWarning("TowerDefenseGame is missing BuildZone reference. Creating a temporary runtime BuildZone fallback.");
 
         GameObject buildZoneObject = new GameObject(buildZoneName);
         buildZoneObject.transform.position = new Vector3(0f, 0.25f, 0f);
@@ -1371,20 +1461,11 @@ public class TowerDefenseGame : MonoBehaviour
         boxCollider.isTrigger = true;
         boxCollider.size = new Vector2(18f, 10.5f);
 
-        return buildZoneObject.AddComponent<BuildZone>();
+        buildZoneReference = buildZoneObject.AddComponent<BuildZone>();
+        return buildZoneReference;
     }
 }
 
-/// <summary>
-/// PlacementAreaOverlayRenderer 璐熻矗鎶娾€滃綋鍓嶅绫诲瀷鐪熸鍏佽钀戒腑蹇冪偣鐨勪綅缃€濈粯鍒舵垚涓€寮犱笘鐣岀┖闂磋鐩栧浘銆?///
-/// 涓轰粈涔堣繖閲屼笉鍐嶆墜鍐欎竴濂楀崟鐙殑鍑犱綍鍙鍖栬鍒欙紵
-/// 鍥犱负褰撳墠鐪熷疄鏀剧疆鍒ゅ畾宸茬粡鍚屾椂渚濊禆锛?/// - BuildZone
-/// - 鍒濆閮ㄧ讲鍖?/ 宸插缓濉旈儴缃茬綉缁?/// - PlacementBlocker
-/// - 宸叉湁濉斿崰鍦扮鎾?///
-/// 濡傛灉瑕嗙洊灞傝嚜宸卞啀澶嶅埗涓€濂楄鍒欙紝
-/// 寰堝鏄撳嚭鐜扳€滅敾鍑烘潵鑳芥斁锛屼絾鐪熸鐐逛笅鍘诲嵈涓嶈兘鏀锯€濈殑淇℃伅鍒嗗弶銆?///
-/// 鎵€浠ヨ繖閲岄噰鐢ㄤ竴涓洿绋崇殑鍋氭硶锛?/// 鐩存帴鎸変竴瀹氬垎杈ㄧ巼閲嶆斁鐪熷疄鍒ゅ畾鍑芥暟锛?/// 鎶婃瘡涓噰鏍风偣鏄笉鏄悎娉曪紝鐑樻垚涓€寮犲甫杈圭紭楂樹寒鐨勮创鍥俱€?///
-/// 杩欑鏂规涓嶆槸鏈€鏁板鍖栫殑瑙ｆ瀽瑁佸壀锛?/// 浣嗗畠鏈€澶х殑浠峰€兼槸锛?/// 鍙鍖栧拰鐪熷疄鐜╂硶姘歌繙鏉ヨ嚜鍚屼竴濂楀垽鏂€昏緫銆?/// 瀵瑰綋鍓嶅師鍨嬫湡椤圭洰鏉ヨ锛岃繖鏄潪甯稿垝绠楃殑鎶樹腑銆?/// </summary>
 public sealed class PlacementAreaOverlayRenderer : IDisposable
 {
     /// <summary>

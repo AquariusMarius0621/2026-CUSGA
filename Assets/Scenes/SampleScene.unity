@@ -1550,6 +1550,25 @@ MonoBehaviour:
   placementAreaOverlayFillColor: {r: 0.18, g: 0.82, b: 0.86, a: 0.16}
   placementAreaOverlayEdgeColor: {r: 0.72, g: 1, b: 0.97, a: 0.52}
   placementAreaOverlaySortingOrder: 12
+  mainCameraReference: {fileID: 519420031}
+  relayTowerPrototypeReference: {fileID: 1548685746}
+  defenseTowerPrototypeReference: {fileID: 1719944049}
+  placedTowerRootReference: {fileID: 767248244}
+  placementPreviewRootReference: {fileID: 0}
+  buildZoneReference: {fileID: 425466730}
+  energyTextReference: {fileID: 4181002}
+  baseHealthTextReference: {fileID: 676675441}
+  waveTextReference: {fileID: 1436609492}
+  selectionTextReference: {fileID: 1313010503}
+  statusTextReference: {fileID: 820197643}
+  relayTowerButtonReference: {fileID: 203997010}
+  defenseTowerButtonReference: {fileID: 1735439456}
+  clearSelectionButtonReference: {fileID: 102409830}
+  gameOverPanelReference: {fileID: 572996568}
+  gameOverTitleReference: {fileID: 1452915148}
+  gameOverHintReference: {fileID: 778731073}
+  dragPreviewPanelReference: {fileID: 1896918675}
+  dragPreviewLabelReference: {fileID: 1460340617}
   mainCameraName: Main Camera
   relayTowerPrototypeName: RelayTowerPrototype
   defenseTowerPrototypeName: DefenseTowerPrototype
@@ -9675,6 +9694,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   initialDelay: 1.5
   delayBetweenWaves: 4
+  enemyPathReference: {fileID: 883511605}
+  enemyPrototypeReference: {fileID: 198271665}
+  enemyRootReference: {fileID: 2035091432}
   enemyPathName: EnemyPath
   enemyPrototypeName: EnemyPrototype
   enemyRootName: EnemiesRoot

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// WaveSpawner 负责按波次控制敌人的生成节奏。
@@ -60,6 +60,23 @@ public class WaveSpawner : MonoBehaviour
     /// </summary>
     [SerializeField] private float delayBetweenWaves = 4f;
 
+    [Header("Scene References (Preferred)")]
+
+    /// <summary>
+    /// 这是第一阶段迁移里给刷怪器补上的显式场景引用。
+    ///
+    /// 长期来看，WaveSpawner 这种核心流程脚本更适合直接看 Inspector 就知道自己依赖什么：
+    /// - 敌人走哪条路
+    /// - 从哪个原型生成
+    /// - 生成后挂到哪个根节点下
+    ///
+    /// 所以这里改成“引用优先、名字兜底”，
+    /// 先把最核心的隐式依赖关系显式化，再慢慢移除旧 fallback。
+    /// </summary>
+    [SerializeField] private EnemyPath enemyPathReference;
+    [SerializeField] private GameObject enemyPrototypeReference;
+    [SerializeField] private Transform enemyRootReference;
+
     [Header("Scene Object Names")]
 
     /// <summary>
@@ -67,14 +84,12 @@ public class WaveSpawner : MonoBehaviour
     ///
     /// 刷怪器会通过它找到敌人出生点和路线数据。
     /// </summary>
-    [SerializeField] private string enemyPathName = "EnemyPath";
 
     /// <summary>
     /// 敌人原型对象名称。
     ///
     /// 每次刷怪时都会克隆这个模板。
     /// </summary>
-    [SerializeField] private string enemyPrototypeName = "EnemyPrototype";
 
     /// <summary>
     /// 运行时敌人实例父节点名称。
@@ -154,13 +169,17 @@ public class WaveSpawner : MonoBehaviour
     {
         EnsureWaveData();
 
-        _enemyPath = SceneObjectFinder.FindComponent<EnemyPath>(enemyPathName);
-        _enemyPrototype = SceneObjectFinder.FindGameObject(enemyPrototypeName);
-        _enemyRoot = SceneObjectFinder.FindOrCreateTransform(enemyRootName);
+        // 继续把刷怪主链从“按名字找对象”迁到“显式场景装配”。
+        // 对当前 SampleScene 而言，EnemyPath 和 EnemyPrototype 都应当明确拖在 Inspector 上；
+        // EnemiesRoot 如果没拖，则这里允许安全地新建一个运行时容器，但不再靠名字去搜旧对象。
+        _enemyPath = enemyPathReference;
+        _enemyPrototype = enemyPrototypeReference;
+        _enemyRoot = enemyRootReference != null ? enemyRootReference : new GameObject(enemyRootName).transform;
+        enemyRootReference = _enemyRoot;
 
         if (_enemyPath == null || _enemyPrototype == null)
         {
-            Debug.LogWarning("WaveSpawner 缺少 EnemyPath 或 EnemyPrototype，无法开始刷怪。");
+            Debug.LogWarning("WaveSpawner is missing EnemyPath or EnemyPrototype reference. Check the scene wiring.");
             enabled = false;
             return;
         }
