@@ -41,9 +41,12 @@ public class TowerShopCard : MonoBehaviour,
     /// <summary>
     /// 这张部署卡对应的塔类型。
     ///
-    /// 理想情况是你在 Inspector 里明确配置它；
-    /// 但为了降低场景装配失误带来的故障概率，
-    /// 这个脚本也会在未配置时，根据对象名自动推断。
+    /// 这一轮改完后，卡片身份必须由 Inspector 显式配置，
+    /// 不再允许脚本根据对象名偷偷推断。
+    ///
+    /// 这样做的好处是：
+    /// - 改层级和改对象名时，不会把部署卡身份一起改乱。
+    /// - 场景装配错误会更早暴露，而不是被隐式回退逻辑掩盖。
     /// </summary>
     [SerializeField] private TowerType towerType = TowerType.None;
 
@@ -131,15 +134,6 @@ public class TowerShopCard : MonoBehaviour,
         }
 
         _originalScale = transform.localScale;
-        ResolveTowerTypeFromNameIfNeeded();
-    }
-
-    /// <summary>
-    /// 在编辑器里对象名或序列化字段变化时，自动尝试补齐 towerType。
-    /// </summary>
-    private void OnValidate()
-    {
-        ResolveTowerTypeFromNameIfNeeded();
     }
 
     /// <summary>
@@ -180,7 +174,7 @@ public class TowerShopCard : MonoBehaviour,
     /// </summary>
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (eventData.button != PointerEventData.InputButton.Left || eventData.dragging || TowerDefenseGame.Instance == null)
+        if (eventData.button != PointerEventData.InputButton.Left || eventData.dragging || TowerDefenseGame.Instance == null || !HasConfiguredTowerType())
         {
             return;
         }
@@ -203,7 +197,7 @@ public class TowerShopCard : MonoBehaviour,
     {
         _isPointerOver = true;
 
-        if (_isDragging || TowerDefenseGame.Instance == null)
+        if (_isDragging || TowerDefenseGame.Instance == null || !HasConfiguredTowerType())
         {
             return;
         }
@@ -228,7 +222,7 @@ public class TowerShopCard : MonoBehaviour,
     /// </summary>
     public void OnBeginDrag(PointerEventData eventData)
     {
-        if (eventData.button != PointerEventData.InputButton.Left || TowerDefenseGame.Instance == null)
+        if (eventData.button != PointerEventData.InputButton.Left || TowerDefenseGame.Instance == null || !HasConfiguredTowerType())
         {
             return;
         }
@@ -290,23 +284,25 @@ public class TowerShopCard : MonoBehaviour,
     }
 
     /// <summary>
-    /// 在没有手动配置 towerType 时，根据对象名自动推断。
+    /// 明确检查这张部署卡是否已经在 Inspector 里配置好 towerType。
+    ///
+    /// 旧版本为了图省事，会在这里偷偷根据对象名推断“这是发电机卡还是炮塔卡”。
+    /// 这种写法虽然原型期跑得快，但会把对象名变成隐藏依赖，
+    /// 以后只要你为了整理层级改一下名字，交互身份就可能悄悄变掉。
+    ///
+    /// 现在我们把卡片身份收回到显式序列化字段里：
+    /// - 场景里该配什么塔型，就直接在 Inspector 明确配好。
+    /// - 如果忘了配，就明确报出告警，而不是继续猜。
     /// </summary>
-    private void ResolveTowerTypeFromNameIfNeeded()
+    private bool HasConfiguredTowerType()
     {
         if (towerType != TowerType.None)
         {
-            return;
+            return true;
         }
 
-        if (name.Contains("Relay"))
-        {
-            towerType = TowerType.Relay;
-        }
-        else if (name.Contains("Defense"))
-        {
-            towerType = TowerType.Defense;
-        }
+        Debug.LogWarning("TowerShopCard 缺少 towerType 显式配置。请在 Inspector 中为这张部署卡指定塔类型。", this);
+        return false;
     }
 
     /// <summary>

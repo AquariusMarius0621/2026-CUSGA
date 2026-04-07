@@ -1135,6 +1135,10 @@ MonoBehaviour:
   bodyColor: {r: 0.9, g: 0.25, b: 0.25, a: 1}
   healthBarFillColor: {r: 0.2, g: 0.9, b: 0.35, a: 1}
   healthBarBackgroundColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  healthBarRootReference: {fileID: 1166943926}
+  healthBarFillReference: {fileID: 477070562}
+  healthBarFillRendererReference: {fileID: 477070561}
+  healthBarBackgroundRendererReference: {fileID: 626660988}
 --- !u!1 &203997008
 GameObject:
   m_ObjectHideFlags: 0

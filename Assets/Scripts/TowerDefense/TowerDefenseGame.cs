@@ -84,21 +84,6 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private string placementPreviewRootName = "PlacementPreviewRoot";
     [SerializeField] private string buildZoneName = "BuildZone";
 
-    [Header("UI Object Names")]
-    [SerializeField] private string energyTextName = "EnergyText";
-    [SerializeField] private string baseHealthTextName = "BaseHealthText";
-    [SerializeField] private string waveTextName = "WaveText";
-    [SerializeField] private string selectionTextName = "SelectionText";
-    [SerializeField] private string statusTextName = "StatusText";
-    [SerializeField] private string relayTowerButtonName = "RelayTowerButton";
-    [SerializeField] private string defenseTowerButtonName = "DefenseTowerButton";
-    [SerializeField] private string clearSelectionButtonName = "ClearSelectionButton";
-    [SerializeField] private string gameOverPanelName = "GameOverPanel";
-    [SerializeField] private string gameOverTitleName = "GameOverTitle";
-    [SerializeField] private string gameOverHintName = "GameOverHint";
-    [SerializeField] private string dragPreviewPanelName = "DragPreviewPanel";
-    [SerializeField] private string dragPreviewLabelName = "DragPreviewLabel";
-
     [Header("HUD References (Preferred)")]
 
     /// <summary>
@@ -551,20 +536,7 @@ public class TowerDefenseGame : MonoBehaviour
                 cardRoleSummary: "Frontline Damage",
                 accentColor: new Color(0.28f, 0.78f, 1f, 1f)));
 
-        _hudPresenter = new TowerDefenseHudPresenter(
-            energyTextName: energyTextName,
-            baseHealthTextName: baseHealthTextName,
-            waveTextName: waveTextName,
-            selectionTextName: selectionTextName,
-            statusTextName: statusTextName,
-            relayTowerButtonName: relayTowerButtonName,
-            defenseTowerButtonName: defenseTowerButtonName,
-            clearSelectionButtonName: clearSelectionButtonName,
-            gameOverPanelName: gameOverPanelName,
-            gameOverTitleName: gameOverTitleName,
-            gameOverHintName: gameOverHintName,
-            dragPreviewPanelName: dragPreviewPanelName,
-            dragPreviewLabelName: dragPreviewLabelName);
+        _hudPresenter = new TowerDefenseHudPresenter();
     }
 
     /// <summary>

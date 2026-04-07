@@ -63,6 +63,40 @@ public class Enemy : MonoBehaviour
     /// </summary>
     [SerializeField] private Color healthBarBackgroundColor = new Color(0.15f, 0.15f, 0.15f, 1f);
 
+    [Header("Health Bar References")]
+
+    /// <summary>
+    /// 敌人血条根节点的显式引用。
+    ///
+    /// 现在我们不再靠 	ransform.Find("HealthBarRoot") 这种名字查找去摸索层级，
+    /// 而是要求预制体或场景原型把血条根明确接到这里。
+    /// 这样后续即使你重命名子节点，血条系统也不会因为名字变化而悄悄失效。
+    /// </summary>
+    [SerializeField] private Transform healthBarRootReference;
+
+    /// <summary>
+    /// 血条填充条的显式引用。
+    ///
+    /// 有了这个引用后，运行时只需要改它的缩放和位置，
+    /// 不再需要一层层按名字去树里找 Fill 子节点。
+    /// </summary>
+    [SerializeField] private Transform healthBarFillReference;
+
+    /// <summary>
+    /// 填充条 SpriteRenderer 的显式引用。
+    ///
+    /// 这样颜色主题应用也能直接命中目标，
+    /// 不必再从填充节点向下或向旁边做任何名字推断。
+    /// </summary>
+    [SerializeField] private SpriteRenderer healthBarFillRendererReference;
+
+    /// <summary>
+    /// 血条背景 SpriteRenderer 的显式引用。
+    ///
+    /// 这条引用和 Fill 一起，组成了完整的血条显式装配链。
+    /// </summary>
+    [SerializeField] private SpriteRenderer healthBarBackgroundRendererReference;
+
     /// <summary>
     /// 敌人主体的 SpriteRenderer 缓存。
     /// </summary>
@@ -168,6 +202,21 @@ public class Enemy : MonoBehaviour
         if (_healthBarRoot != null)
         {
             _healthBarRoot.gameObject.SetActive(visible);
+        }
+    }
+
+    /// <summary>
+    /// 在编辑器里尽量补齐“显式血条引用链”的轻量派生项。
+    ///
+    /// 这里不再按名字去找血条子节点，
+    /// 但如果填充节点引用已经明确拖好了，而对应的 SpriteRenderer 还没接，
+    /// 我们就直接从这个显式引用上拿组件，减少重复手工操作。
+    /// </summary>
+    private void OnValidate()
+    {
+        if (healthBarFillReference != null && healthBarFillRendererReference == null)
+        {
+            healthBarFillRendererReference = healthBarFillReference.GetComponent<SpriteRenderer>();
         }
     }
 
@@ -365,8 +414,12 @@ public class Enemy : MonoBehaviour
     /// <summary>
     /// 缓存敌人本体和血条相关节点引用。
     ///
-    /// 这里采用“如果还没缓存过再去找”的方式，
-    /// 既能避免重复查找，也能让 Initialize 在需要时安全重入。
+    /// 这一轮改完后，血条链路优先走显式序列化引用：
+    /// - 原型或预制体把 Root / Fill / Background 直接拖进来
+    /// - 运行时实例直接继承这些引用
+    ///
+    /// 这样我们既保留了“只在第一次缓存时做轻量整理”的结构，
+    /// 又把按名字找子节点的隐藏依赖彻底移出了主流程。
     /// </summary>
     private void CacheReferences()
     {
@@ -377,26 +430,26 @@ public class Enemy : MonoBehaviour
 
         if (_healthBarRoot == null)
         {
-            _healthBarRoot = transform.Find("HealthBarRoot");
+            _healthBarRoot = healthBarRootReference;
         }
 
-        if (_healthBarRoot != null && _healthBarFill == null)
+        if (_healthBarFill == null)
         {
-            _healthBarFill = _healthBarRoot.Find("HealthBarFill");
+            _healthBarFill = healthBarFillReference;
         }
 
-        if (_healthBarFill != null && _healthBarFillRenderer == null)
+        if (_healthBarFillRenderer == null)
         {
-            _healthBarFillRenderer = _healthBarFill.GetComponent<SpriteRenderer>();
+            _healthBarFillRenderer = healthBarFillRendererReference;
+            if (_healthBarFillRenderer == null && _healthBarFill != null)
+            {
+                _healthBarFillRenderer = _healthBarFill.GetComponent<SpriteRenderer>();
+            }
         }
 
         if (_healthBarBackgroundRenderer == null)
         {
-            Transform background = _healthBarRoot != null ? _healthBarRoot.Find("HealthBarBackground") : null;
-            if (background != null)
-            {
-                _healthBarBackgroundRenderer = background.GetComponent<SpriteRenderer>();
-            }
+            _healthBarBackgroundRenderer = healthBarBackgroundRendererReference;
         }
     }
 

@@ -281,7 +281,7 @@ public sealed class MainMenuController : MonoBehaviour
             return;
         }
 
-        ResolveExistingReferences();
+        ValidateBoundReferences();
     }
 
     /// <summary>
@@ -448,53 +448,58 @@ public sealed class MainMenuController : MonoBehaviour
     }
 
     /// <summary>
-    /// 如果默认骨架已经建好，就按对象名把引用回填回来。
+    /// 当主菜单骨架已经搭好后，我们改成“显式引用优先”的维护方式。
     ///
-    /// 这样即使你在 Inspector 里丢了某个引用，
-    /// 脚本也能尽量从当前场景结构里把它找回来，减少维护成本。
+    /// 这里不再像旧版本那样，悄悄按对象名把一整套 UI 子节点再找回来；
+    /// 原因是主菜单场景现在已经把这些引用序列化保存好了，
+    /// 再去按名字回填，反而会让对象名重新承担装配职责，后续改名也更不安心。
+    ///
+    /// 因此这一步只做两件事：
+    /// 1. 补齐那些可以从已绑定组件直接推导出的轻量引用，例如按钮底图。
+    /// 2. 对真正缺失的关键引用输出明确告警，提醒维护者去 Inspector 里补。
     /// </summary>
-    private void ResolveExistingReferences()
+    private void ValidateBoundReferences()
     {
-        if (mainCanvas == null)
-        {
-            mainCanvas = FindObjectOfType<Canvas>();
-        }
-
-        if (mainCanvas == null)
-        {
-            return;
-        }
-
-        RectTransform canvasRect = mainCanvas.transform as RectTransform;
-        menuRoot = FindRect(canvasRect, RootName);
-        backgroundPanel = FindImage(canvasRect, BackgroundName);
-
-        if (menuRoot == null)
-        {
-            return;
-        }
-
-        frameCorePanel = FindImage(menuRoot, FrameCoreName);
-        frameInsetPanel = FindImage(menuRoot, FrameInsetName);
-        titleText = FindText(menuRoot, TitleName);
-        subtitleText = FindText(menuRoot, SubtitleName);
-        descriptionText = FindText(menuRoot, DescriptionName);
-        hintText = FindText(menuRoot, HintName);
-        footerLeftText = FindText(menuRoot, FooterLeftName);
-        footerRightText = FindText(menuRoot, FooterRightName);
-        startButton = FindButton(menuRoot, StartButtonName);
-
         if (startButton != null)
         {
             startButtonImage = startButton.GetComponent<Image>();
-            startButtonPrimaryText = FindText(startButton.transform as RectTransform, StartPrimaryName);
-            startButtonSecondaryText = FindText(startButton.transform as RectTransform, StartSecondaryName);
         }
+
+        WarnIfMissing(sceneCamera, nameof(sceneCamera));
+        WarnIfMissing(mainCanvas, nameof(mainCanvas));
+        WarnIfMissing(canvasScaler, nameof(canvasScaler));
+        WarnIfMissing(graphicRaycaster, nameof(graphicRaycaster));
+        WarnIfMissing(eventSystem, nameof(eventSystem));
+        WarnIfMissing(standaloneInputModule, nameof(standaloneInputModule));
+        WarnIfMissing(menuRoot, nameof(menuRoot));
+        WarnIfMissing(backgroundPanel, nameof(backgroundPanel));
+        WarnIfMissing(frameCorePanel, nameof(frameCorePanel));
+        WarnIfMissing(frameInsetPanel, nameof(frameInsetPanel));
+        WarnIfMissing(titleText, nameof(titleText));
+        WarnIfMissing(subtitleText, nameof(subtitleText));
+        WarnIfMissing(descriptionText, nameof(descriptionText));
+        WarnIfMissing(hintText, nameof(hintText));
+        WarnIfMissing(startButton, nameof(startButton));
+        WarnIfMissing(startButtonImage, nameof(startButtonImage));
+        WarnIfMissing(startButtonPrimaryText, nameof(startButtonPrimaryText));
+        WarnIfMissing(startButtonSecondaryText, nameof(startButtonSecondaryText));
+        WarnIfMissing(footerLeftText, nameof(footerLeftText));
+        WarnIfMissing(footerRightText, nameof(footerRightText));
     }
 
     /// <summary>
-    /// 解析项目可用的 TMP 字体。
+    /// 主菜单现在走“显式场景装配”后，缺引用应该尽早暴露出来，
+    /// 而不是继续靠隐式查找把问题藏住。
     /// </summary>
+    private void WarnIfMissing(Object reference, string fieldName)
+    {
+        if (reference != null)
+        {
+            return;
+        }
+
+        Debug.LogWarning($"MainMenuController 缺少场景引用：{fieldName}。请在 MainMenu 场景的 Inspector 中补齐。", this);
+    }
     private static TMP_FontAsset ResolveFontAsset()
     {
         if (TMP_Settings.defaultFontAsset != null)
@@ -623,36 +628,6 @@ public sealed class MainMenuController : MonoBehaviour
 
     /// <summary>
     /// 查找某个同名子 Image。
-    /// </summary>
-    private static Image FindImage(RectTransform parent, string objectName)
-    {
-        RectTransform rectTransform = FindRect(parent, objectName);
-        return rectTransform != null ? rectTransform.GetComponent<Image>() : null;
-    }
-
-    /// <summary>
-    /// 查找某个同名子按钮。
-    /// </summary>
-    private static Button FindButton(RectTransform parent, string objectName)
-    {
-        RectTransform rectTransform = FindRect(parent, objectName);
-        return rectTransform != null ? rectTransform.GetComponent<Button>() : null;
-    }
-
-    /// <summary>
-    /// 查找某个同名子 TMP 文本。
-    /// </summary>
-    private static TextMeshProUGUI FindText(RectTransform parent, string objectName)
-    {
-        RectTransform rectTransform = FindRect(parent, objectName);
-        return rectTransform != null ? rectTransform.GetComponent<TextMeshProUGUI>() : null;
-    }
-
-    /// <summary>
-    /// 在编辑器里把场景标成已修改。
-    ///
-    /// 这样主菜单 UI 首次补齐后，
-    /// 你一眼就能看出场景需要保存，保存后这些对象就会真正写进场景文件里。
     /// </summary>
     private void MarkSceneDirty()
     {

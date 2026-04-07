@@ -80,37 +80,10 @@ public readonly struct TowerDragPreviewState
     public string InvalidReason { get; }
 }
 
-/// <summary>
-/// TowerDefenseHudPresenter 是当前塔防玩法 HUD 的表现层适配器。
-///
-/// 这一版的设计目标非常明确：
-/// - 场景负责布局和大部分视觉样式
-/// - 脚本只负责动态内容刷新和少量必要状态同步
-///
-/// 也就是说，这个类现在不再承担：
-/// - 运行时强制重排顶部卡片和右侧部署区
-/// - 运行时大规模重写面板样式
-/// - 运行时生成一堆额外装饰节点
-///
-/// 这样你以后打开 `SampleScene` 时，
-/// 看到的 HUD 基本就是可以直接在 Scene / Inspector 里改的真实界面，
 /// 不会一进 Play 就又被脚本全部摆回去。
 /// </summary>
 public sealed class TowerDefenseHudPresenter
 {
-    private readonly string _energyTextName;
-    private readonly string _baseHealthTextName;
-    private readonly string _waveTextName;
-    private readonly string _selectionTextName;
-    private readonly string _statusTextName;
-    private readonly string _relayTowerButtonName;
-    private readonly string _defenseTowerButtonName;
-    private readonly string _clearSelectionButtonName;
-    private readonly string _gameOverPanelName;
-    private readonly string _gameOverTitleName;
-    private readonly string _gameOverHintName;
-    private readonly string _dragPreviewPanelName;
-    private readonly string _dragPreviewLabelName;
 
     private TMP_Text _energyText;
     private TMP_Text _baseHealthText;
@@ -130,35 +103,6 @@ public sealed class TowerDefenseHudPresenter
     private GameObject _gameOverPanel;
     private GameObject _dragPreviewPanel;
 
-    public TowerDefenseHudPresenter(
-        string energyTextName,
-        string baseHealthTextName,
-        string waveTextName,
-        string selectionTextName,
-        string statusTextName,
-        string relayTowerButtonName,
-        string defenseTowerButtonName,
-        string clearSelectionButtonName,
-        string gameOverPanelName,
-        string gameOverTitleName,
-        string gameOverHintName,
-        string dragPreviewPanelName,
-        string dragPreviewLabelName)
-    {
-        _energyTextName = energyTextName;
-        _baseHealthTextName = baseHealthTextName;
-        _waveTextName = waveTextName;
-        _selectionTextName = selectionTextName;
-        _statusTextName = statusTextName;
-        _relayTowerButtonName = relayTowerButtonName;
-        _defenseTowerButtonName = defenseTowerButtonName;
-        _clearSelectionButtonName = clearSelectionButtonName;
-        _gameOverPanelName = gameOverPanelName;
-        _gameOverTitleName = gameOverTitleName;
-        _gameOverHintName = gameOverHintName;
-        _dragPreviewPanelName = dragPreviewPanelName;
-        _dragPreviewLabelName = dragPreviewLabelName;
-    }
 
     /// <summary>
     /// 由外部把已经在 Inspector 中拖好的 HUD 引用直接注入进来。
@@ -236,19 +180,19 @@ public sealed class TowerDefenseHudPresenter
             _clearSelectionButtonText = _clearSelectionButton.GetComponentInChildren<TMP_Text>(true);
         }
 
-        WarnIfMissing(_energyText, _energyTextName);
-        WarnIfMissing(_baseHealthText, _baseHealthTextName);
-        WarnIfMissing(_waveText, _waveTextName);
-        WarnIfMissing(_selectionText, _selectionTextName);
-        WarnIfMissing(_statusText, _statusTextName);
-        WarnIfMissing(_relayTowerButton, _relayTowerButtonName);
-        WarnIfMissing(_defenseTowerButton, _defenseTowerButtonName);
-        WarnIfMissing(_clearSelectionButton, _clearSelectionButtonName);
-        WarnIfMissing(_gameOverPanel, _gameOverPanelName);
-        WarnIfMissing(_gameOverTitle, _gameOverTitleName);
-        WarnIfMissing(_gameOverHint, _gameOverHintName);
-        WarnIfMissing(_dragPreviewPanel, _dragPreviewPanelName);
-        WarnIfMissing(_dragPreviewLabel, _dragPreviewLabelName);
+        WarnIfMissing(_energyText, "EnergyText");
+        WarnIfMissing(_baseHealthText, "BaseHealthText");
+        WarnIfMissing(_waveText, "WaveText");
+        WarnIfMissing(_selectionText, "SelectionText");
+        WarnIfMissing(_statusText, "StatusText");
+        WarnIfMissing(_relayTowerButton, "RelayTowerButton");
+        WarnIfMissing(_defenseTowerButton, "DefenseTowerButton");
+        WarnIfMissing(_clearSelectionButton, "ClearSelectionButton");
+        WarnIfMissing(_gameOverPanel, "GameOverPanel");
+        WarnIfMissing(_gameOverTitle, "GameOverTitle");
+        WarnIfMissing(_gameOverHint, "GameOverHint");
+        WarnIfMissing(_dragPreviewPanel, "DragPreviewPanel");
+        WarnIfMissing(_dragPreviewLabel, "DragPreviewLabel");
     }
 
     private static void WarnIfMissing(UnityEngine.Object reference, string expectedName)
