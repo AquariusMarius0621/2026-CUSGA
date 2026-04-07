@@ -201,7 +201,7 @@ GameObject:
   m_Component:
   - component: {fileID: 91802067}
   - component: {fileID: 91802068}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: MainMenuRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -338,7 +338,7 @@ GameObject:
   - component: {fileID: 591426808}
   - component: {fileID: 591426810}
   - component: {fileID: 591426809}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: FooterRightText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -472,7 +472,7 @@ GameObject:
   - component: {fileID: 614318681}
   - component: {fileID: 614318683}
   - component: {fileID: 614318682}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: FrameCore
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -547,7 +547,7 @@ GameObject:
   - component: {fileID: 888549954}
   - component: {fileID: 888549956}
   - component: {fileID: 888549955}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: FooterLeftText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -681,7 +681,7 @@ GameObject:
   - component: {fileID: 1101017460}
   - component: {fileID: 1101017462}
   - component: {fileID: 1101017461}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: TitleText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -727,7 +727,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u7535\u91CF\u9632\u7EBF"
+  m_text: Power Grid Defense
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -883,7 +883,7 @@ GameObject:
   - component: {fileID: 1333539190}
   - component: {fileID: 1333539192}
   - component: {fileID: 1333539191}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: StartButtonSecondaryText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1017,7 +1017,7 @@ GameObject:
   - component: {fileID: 1394494275}
   - component: {fileID: 1394494277}
   - component: {fileID: 1394494276}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: SubtitleText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1151,7 +1151,7 @@ GameObject:
   - component: {fileID: 1401625925}
   - component: {fileID: 1401625927}
   - component: {fileID: 1401625926}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: StartButtonPrimaryText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1197,7 +1197,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u5F00\u59CB\u6E38\u620F"
+  m_text: Start Game
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1285,7 +1285,7 @@ GameObject:
   - component: {fileID: 1492388902}
   - component: {fileID: 1492388904}
   - component: {fileID: 1492388903}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: DescriptionText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1331,7 +1331,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u5728\u8FD9\u91CC\u8FDB\u5165\u5F53\u524D\u5854\u9632\u6D4B\u8BD5\u5173\u5361\u3002\n\n\u4F60\u5C06\u4F7F\u7528\u53D1\u7535\u673A\u4E0E\u70AE\u5854\uFF0C\u5728\u6709\u9650\u7535\u91CF\u4E0B\u6CBF\u90E8\u7F72\u7F51\u7EDC\u9010\u6B65\u6269\u5F20\u9632\u7EBF\u3002\n\n\u70B9\u51FB\u4E0B\u65B9\u5F00\u59CB\uFF0C\u5373\u53EF\u5207\u6362\u5230\u5F53\u524D\u5236\u4F5C\u4E2D\u7684\u73A9\u6CD5\u573A\u666F\u3002"
+  m_text: Enter the current tower-defense test mission here.\n\nUse generators and turrets to expand your defense network under limited energy.\n\nPress Start below to load the active gameplay scene.
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1419,7 +1419,7 @@ GameObject:
   - component: {fileID: 1550870744}
   - component: {fileID: 1550870746}
   - component: {fileID: 1550870745}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: FrameInset
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1494,7 +1494,7 @@ GameObject:
   - component: {fileID: 1646251665}
   - component: {fileID: 1646251667}
   - component: {fileID: 1646251666}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: BackgroundPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1570,7 +1570,7 @@ GameObject:
   - component: {fileID: 1674773601}
   - component: {fileID: 1674773600}
   - component: {fileID: 1674773599}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: MainMenuCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1673,7 +1673,7 @@ GameObject:
   - component: {fileID: 1934371858}
   - component: {fileID: 1934371857}
   - component: {fileID: 1934371856}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: StartGameButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1794,7 +1794,7 @@ GameObject:
   - component: {fileID: 1991076893}
   - component: {fileID: 1991076895}
   - component: {fileID: 1991076894}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: HintText
   m_TagString: Untagged
   m_Icon: {fileID: 0}

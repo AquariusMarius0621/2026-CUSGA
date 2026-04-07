@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -99,10 +99,44 @@ public class TowerDefenseGame : MonoBehaviour
     private BuildZone _buildZone;
     private Transform _placedTowerRoot;
     private Transform _placementPreviewRoot;
+
+    /// <summary>
+    /// 用于放置判定的非分配物理重叠缓存。
+    ///
+    /// 覆盖层会反复重放真实放置判定，
+    /// 如果每次都让物理查询返回一个新数组，就很容易把 GC 压力抬高。
+    /// 这里固定复用一块缓存区，优先消灭这类短时分配。
+    /// </summary>
+    private readonly Collider2D[] _placementValidationOverlapBuffer = new Collider2D[64];
     private GameObject _placementPreviewInstance;
+    private TowerType _placementPreviewTowerType = TowerType.None;
     private SpriteRenderer _placementPreviewSpriteRenderer;
     private SpriteRenderer _placementPreviewRingRenderer;
     private PlacementAreaOverlayRenderer _placementAreaOverlayRenderer;
+
+    /// <summary>
+    /// 当前可放置区域覆盖层缓存对应的布局版本号。
+    ///
+    /// 只要场上已建塔布局没变化，这份覆盖层结果就仍然有效，
+    /// 没必要每次开始拖拽都重新把整张合法区域重算一遍。
+    /// </summary>
+    private int _placementAreaOverlayRevision;
+
+    /// <summary>
+    /// 当前已经预热完成的覆盖层版本号。
+    ///
+    /// 它和 `_placementAreaOverlayPreparedTowerType` 组合起来，
+    /// 用来判断这次拖拽能不能直接吃缓存。
+    /// </summary>
+    private int _placementAreaOverlayPreparedRevision = -1;
+
+    /// <summary>
+    /// 当前缓存好的覆盖层对应的是哪种塔。
+    ///
+    /// 因为不同塔的占地半径不同，最终合法区域也会不同，
+    /// 所以缓存键不能只看布局版本，还要看塔类型。
+    /// </summary>
+    private TowerType _placementAreaOverlayPreparedTowerType = TowerType.None;
 
     /// <summary>
     /// `_towerCatalog` 缂佺喍绔寸€涙ɑ鏂侀崥鍕潚婵夋梻娈戦棃娆愨偓浣哥暰娑斿鈧?    ///
@@ -151,6 +185,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void OnDestroy()
     {
+        ReleasePlacementPreviewInstance();
         _placementAreaOverlayRenderer?.Dispose();
 
         if (Instance == this)
@@ -171,7 +206,7 @@ public class TowerDefenseGame : MonoBehaviour
         EnsureRuntimeRoots();
         _hudPresenter.ConfigureCardLabels(_towerCatalog);
 
-        SetStatusMessage("先在初始部署区放下第一座建筑；右侧可选发电机或炮塔，拖拽时会高亮精确合法区域。快捷键 1 / 2 可快速选中。");
+        SetStatusMessage("Place your first structure in the starter zone. Drag a Generator or Turret into a highlighted legal area. Hotkeys: 1 / 2.");
         RefreshHud();
 
         _hudPresenter.SetGameOverVisible(false);
@@ -216,14 +251,14 @@ public class TowerDefenseGame : MonoBehaviour
         {
             _selectedTowerType = towerType;
             RefreshHud();
-            SetStatusMessage($"电量不足，当前只有 {_currentEnergy} 点。");
+            SetStatusMessage($"Not enough energy. You currently have {_currentEnergy} EN.");
             return false;
         }
 
         GameObject prototype = GetPrototype(towerType);
         if (prototype == null)
         {
-            SetStatusMessage("部署卡对应的塔原型缺失，请检查场景配置。");
+            SetStatusMessage("Card prototype is missing. Check the scene setup.");
             return false;
         }
 
@@ -235,10 +270,10 @@ public class TowerDefenseGame : MonoBehaviour
 
         EnsurePlacementPreviewInstance(towerType);
         _hudPresenter.SetDragPreviewVisible(true);
-        RefreshPlacementAreaOverlay(towerType);
+        ShowPreparedPlacementAreaOverlay(towerType);
         RefreshHud();
         UpdatePlacementDrag(screenPosition);
-        SetStatusMessage("把发电机或炮塔拖到高亮的精确合法区域后松手即可部署。");
+        SetStatusMessage("Drag the Generator or Turret into a highlighted legal area, then release to deploy.");
         return true;
     }
 
@@ -290,7 +325,7 @@ public class TowerDefenseGame : MonoBehaviour
 
         if (releasedOverUserInterface)
         {
-            SetStatusMessage("已取消本次部署。");
+            SetStatusMessage("Deployment cancelled.");
         }
         else if (!string.IsNullOrEmpty(invalidReason))
         {
@@ -330,7 +365,7 @@ public class TowerDefenseGame : MonoBehaviour
 
         _currentBaseHealth = Mathf.Max(0, _currentBaseHealth - amount);
         RefreshHud();
-        SetStatusMessage($"怪物突破防线，基地损失了 {amount} 点耐久。");
+        SetStatusMessage($"An enemy slipped through. Base lost {amount} HP.");
 
         if (_currentBaseHealth == 0)
         {
@@ -438,11 +473,12 @@ public class TowerDefenseGame : MonoBehaviour
 
         if (towerType == TowerType.None)
         {
-            SetStatusMessage("已取消部署选择。");
+            SetStatusMessage("Deployment selection cleared.");
         }
         else
         {
-            SetStatusMessage($"当前选中：{GetTowerDisplayName(towerType)}。拖拽部署卡可查看该建筑的精确合法区域。");
+            SetStatusMessage($"Selected: {GetTowerDisplayName(towerType)}. Drag the card to preview exact legal areas.");
+            PrewarmPlacementAreaOverlay(towerType);
         }
 
         RefreshHud();
@@ -537,13 +573,14 @@ public class TowerDefenseGame : MonoBehaviour
     {
         _isGameOver = true;
         CancelPlacementDragInternal();
+        HideActiveEnemyHealthBars();
         Time.timeScale = 0f;
 
         _hudPresenter?.ShowGameOver(
             title: "GAME OVER",
-            hint: "基地已被突破。停止 Play 模式后，可以继续调整关卡与部署逻辑。");
+            hint: "The base has fallen. Exit Play Mode to keep adjusting the level and deployment flow.");
 
-        SetStatusMessage("基地耐久归零，行动失败。");
+        SetStatusMessage("Base integrity depleted. Operation failed.");
         RefreshHud();
     }
 
@@ -551,6 +588,31 @@ public class TowerDefenseGame : MonoBehaviour
     /// 閻喐顒滈幍褑顢戞稉鈧▎鈥崇紦闁姰鈧?    ///
     /// 鏉╂瑩鍣烽弰顖涘閺堝缂撻柅鐘插弳閸欙絾娓剁紒鍫熺湽閸氬牏娈戦崷鐗堟煙閿?    /// - 閸︽澘娴樿箛顐︹偓鐔哄仯閸戝鍎寸純?    /// - 闁劎璁查崡鈩冨珛閹峰€熸儰閻?    /// - 閸忕厧顔愰弮?BuildPad 閻ㄥ嫮鍋ｉ崙璇茬紦闁?    ///
     /// 娑旂喎姘ㄩ弰顖濐嚛閿涘本妫ょ拋铏瑰负鐎硅埖妲搁幀搴濈疄閸欐垼鎹ｅ娲偓鐘侯嚞濮瑰倻娈戦敍?    /// 闁棄绻€妞ゅ鈧俺绻冩潻娆撳櫡缂佺喍绔撮崑姘崇カ濠ф劗绮ㄧ粻妤€鎷伴崥鍫熺《閹冨灲鐎规哎鈧?    /// </summary>
+    /// <summary>
+    /// 在进入 Game Over 结算界面时，主动隐藏当前场上敌人的血条。
+    ///
+    /// 这一步不是为了影响战斗逻辑，而是为了清理结算界面的视觉噪音。
+    /// 当前项目的敌人血条是世界空间里的绿色条形精灵，
+    /// 如果不主动收掉，它们会继续停在画面里，看起来就像 Game Over 面板内部残留的绿色装饰块。
+    ///
+    /// 这里不销毁敌人本体，只隐藏血条：
+    /// - 这样不会额外改变关卡失败当帧的战场状态
+    /// - 也能把“视觉清理”和“玩法结算”两类职责分开
+    /// </summary>
+    private void HideActiveEnemyHealthBars()
+    {
+        int activeEnemyCount = Enemy.ActiveEnemyCount;
+        for (int i = 0; i < activeEnemyCount; i++)
+        {
+            Enemy enemy = Enemy.GetActiveEnemy(i);
+            if (enemy != null)
+            {
+                enemy.SetHealthBarVisible(false);
+            }
+        }
+    }
+
+
     private bool TryPlaceTowerAt(Vector3 worldPosition, TowerType towerType, BuildPad ownerPad = null)
     {
         if (_isGameOver || towerType == TowerType.None)
@@ -560,21 +622,21 @@ public class TowerDefenseGame : MonoBehaviour
 
         if (ownerPad != null && ownerPad.IsOccupied)
         {
-            SetStatusMessage("这个旧塔位已经被占用了。");
+            SetStatusMessage("This legacy build pad is already occupied.");
             return false;
         }
 
         int cost = GetTowerCost(towerType);
         if (_currentEnergy < cost)
         {
-            SetStatusMessage($"电量不足，当前只有 {_currentEnergy} 点。");
+            SetStatusMessage($"Not enough energy. You currently have {_currentEnergy} EN.");
             return false;
         }
 
         GameObject prototype = GetPrototype(towerType);
         if (prototype == null)
         {
-            SetStatusMessage("塔的原型对象没有准备好，请检查场景配置。");
+            SetStatusMessage("Tower prototype is missing. Check the scene setup.");
             return false;
         }
 
@@ -606,7 +668,8 @@ public class TowerDefenseGame : MonoBehaviour
         }
 
         _currentEnergy -= cost;
-        SetStatusMessage($"已部署 {GetTowerDisplayName(towerType)}，消耗 {cost} 点电量。");
+        InvalidatePlacementAreaOverlayCache();
+        SetStatusMessage($"Deployed {GetTowerDisplayName(towerType)} for {cost} EN.");
         RefreshHud();
         return true;
     }
@@ -623,7 +686,7 @@ public class TowerDefenseGame : MonoBehaviour
 
         if (_buildZone == null)
         {
-            invalidReason = "当前关卡没有配置 BuildZone，暂时无法部署。";
+            invalidReason = "No BuildZone is configured in this level.";
             return false;
         }
 
@@ -631,7 +694,7 @@ public class TowerDefenseGame : MonoBehaviour
         // 这条规则保留下来，是为了防止部署网络一路扩到地图设计边界之外。
         if (!_buildZone.ContainsPoint(worldPosition))
         {
-            invalidReason = "超出了当前关卡允许建造的范围。";
+            invalidReason = "Outside the level's buildable area.";
             return false;
         }
 
@@ -644,10 +707,14 @@ public class TowerDefenseGame : MonoBehaviour
 
         // 第三层：即使在部署网络内，也不能压到路径、出生点、基地等禁建区。
         float placementRadius = GetPlacementRadius(towerType);
-        Collider2D[] overlaps = Physics2D.OverlapCircleAll(worldPosition, placementRadius);
-        for (int i = 0; i < overlaps.Length; i++)
+        // 第三层：即使在部署网络内，也不能压到路径、出生点、基地等禁建区。
+        // 这里改成 NonAlloc 查询，是因为这段逻辑不仅用于真正落塔，
+        // 还会被覆盖层可视化重复采样很多次。
+        // 如果继续用 OverlapCircleAll，就会不停创建新数组，拖拽和放塔后很容易出现 GC 卡顿。
+        int overlapCount = Physics2D.OverlapCircleNonAlloc(worldPosition, placementRadius, _placementValidationOverlapBuffer);
+        for (int i = 0; i < overlapCount; i++)
         {
-            Collider2D overlap = overlaps[i];
+            Collider2D overlap = _placementValidationOverlapBuffer[i];
             if (overlap == null)
             {
                 continue;
@@ -669,10 +736,11 @@ public class TowerDefenseGame : MonoBehaviour
             // 这样玩家先看到“归不归当前部署网络管”，再看到“这里会不会和别的塔打架”。
             if (overlap.GetComponentInParent<DefenseTower>() != null || overlap.GetComponentInParent<RelayTower>() != null)
             {
-                invalidReason = "这个位置离其他塔太近了，请稍微挪开一些。";
+                invalidReason = "Too close to another structure. Move it a little.";
                 return false;
             }
         }
+
 
         return true;
     }
@@ -748,7 +816,7 @@ public class TowerDefenseGame : MonoBehaviour
                 return true;
             }
 
-            invalidReason = "首座塔必须先放在初始部署区内。";
+            invalidReason = "Your first structure must be placed in the starter zone.";
             return false;
         }
 
@@ -771,7 +839,7 @@ public class TowerDefenseGame : MonoBehaviour
             }
         }
 
-        invalidReason = "新的塔必须放在已建塔的方形扩张范围内。";
+        invalidReason = "New structures must connect to an existing expansion square.";
         return false;
     }
 
@@ -821,6 +889,121 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
     /// <summary>
+    /// 返回当前这类塔最值得采样的覆盖层边界。
+    ///
+    /// 之前覆盖层默认总是扫整块 BuildZone，
+    /// 这在规则上当然没错，但在性能上非常浪费：
+    /// 大量明明不可能合法的空白区域，也会被重复做精确采样。
+    ///
+    /// 现在我们把采样范围收敛到“当前部署网络本身的外接包围盒”，
+    /// 也就是：
+    /// - 首塔阶段：只看初始部署区
+    /// - 已有塔后：只看所有扩张方格并集的包围范围
+    /// - 最后再和 BuildZone 求交集
+    ///
+    /// 这样不会改变任何真实合法性规则，
+    /// 但能显著减少覆盖层需要评估的像素数量。
+    /// </summary>
+    private Bounds GetPlacementOverlayWorldBounds(TowerType towerType)
+    {
+        if (_buildZone == null)
+        {
+            return new Bounds(Vector3.zero, Vector3.zero);
+        }
+
+        Bounds buildBounds = _buildZone.WorldBounds;
+
+        if (_placedTowerRoot == null || _placedTowerRoot.childCount == 0)
+        {
+            Bounds initialBounds = CreateSquareBounds(initialPlacementSquareCenter, initialPlacementSquareSize);
+            return IntersectBounds(buildBounds, initialBounds);
+        }
+
+        if (!TryBuildPlacementNetworkBounds(out Bounds networkBounds))
+        {
+            return buildBounds;
+        }
+
+        return IntersectBounds(buildBounds, networkBounds);
+    }
+
+    /// <summary>
+    /// 根据场上已建塔提供的扩张方格，构建当前部署网络的总包围盒。
+    ///
+    /// 注意这里并不是求“最终精确合法区域”，
+    /// 而只是求一个足够小、但又能完整包住所有潜在合法区的采样边界。
+    /// 真正是否能放，仍然继续由 `ValidatePlacementPosition` 逐点裁决。
+    /// </summary>
+    private bool TryBuildPlacementNetworkBounds(out Bounds bounds)
+    {
+        bounds = default;
+        bool hasAnyBounds = false;
+
+        if (_placedTowerRoot == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < _placedTowerRoot.childCount; i++)
+        {
+            Transform placedTower = _placedTowerRoot.GetChild(i);
+            if (placedTower == null || !placedTower.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (!TryGetPlacedTowerType(placedTower, out TowerType placedTowerType))
+            {
+                continue;
+            }
+
+            Bounds squareBounds = CreateSquareBounds(placedTower.position, GetExpansionSquareSize(placedTowerType));
+            if (!hasAnyBounds)
+            {
+                bounds = squareBounds;
+                hasAnyBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(squareBounds.min);
+                bounds.Encapsulate(squareBounds.max);
+            }
+        }
+
+        return hasAnyBounds;
+    }
+
+    /// <summary>
+    /// 以中心点和边长构建一个世界空间方形 Bounds。
+    /// </summary>
+    private static Bounds CreateSquareBounds(Vector2 center, float size)
+    {
+        return new Bounds(new Vector3(center.x, center.y, 0f), new Vector3(size, size, 0f));
+    }
+
+    /// <summary>
+    /// 求两个世界包围盒的交集。
+    ///
+    /// 如果两者没有重叠，就返回一个零尺寸 Bounds，
+    /// 上层覆盖层逻辑会自动把它当成“没有可显示区域”。
+    /// </summary>
+    private static Bounds IntersectBounds(Bounds a, Bounds b)
+    {
+        Vector3 min = Vector3.Max(a.min, b.min);
+        Vector3 max = Vector3.Min(a.max, b.max);
+
+        if (max.x <= min.x || max.y <= min.y)
+        {
+            return new Bounds(a.center, Vector3.zero);
+        }
+
+        Bounds intersection = new Bounds();
+        intersection.SetMinMax(min, max);
+        return intersection;
+    }
+
+
+    /// <summary>
     /// 娴犲骸缍嬮崜宥夌炊閺嶅洤鐫嗛獮鏇炴綏閺嶅洩顓哥粻妤佸灛閸﹁桨鑵戦惃鍕瑯閻ｅ苯娼楅弽鍥モ偓?    /// </summary>
     /// <summary>
     /// 根据当前拖拽的塔类型，重新生成一张“精确合法区域”覆盖图。
@@ -830,6 +1013,86 @@ public class TowerDefenseGame : MonoBehaviour
     /// 这样能保证：
     /// 玩家在地图上看到的青色高亮区域，和真正能放下去的中心点区域保持一致。
     /// </summary>
+
+    /// <summary>
+    /// 提前预热某种塔当前版本下的合法区域覆盖层。
+    ///
+    /// 这一步的目标不是立刻显示覆盖图，
+    /// 而是把最重的整图重建尽量前移到“悬停卡片 / 点击选塔”阶段。
+    /// 这样等真正开始拖拽时，通常只需要把缓存重新显示出来。
+    /// </summary>
+    public void PrewarmPlacementAreaOverlay(TowerType towerType)
+    {
+        if (_isGameOver || towerType == TowerType.None)
+        {
+            return;
+        }
+
+        if (_placementAreaOverlayRenderer == null || _buildZone == null || _placementPreviewRoot == null)
+        {
+            return;
+        }
+
+        if (IsPlacementAreaOverlayPreparedFor(towerType))
+        {
+            return;
+        }
+
+        _placementAreaOverlayRenderer.Show(
+            _placementPreviewRoot,
+            GetPlacementOverlayWorldBounds(towerType),
+            worldPosition => ValidatePlacementPosition(worldPosition, towerType, out _));
+        _placementAreaOverlayRenderer.Hide();
+
+        _placementAreaOverlayPreparedRevision = _placementAreaOverlayRevision;
+        _placementAreaOverlayPreparedTowerType = towerType;
+    }
+
+    /// <summary>
+    /// 判断当前缓存里，是否已经有“这类塔 + 当前布局版本”对应的覆盖层结果。
+    /// </summary>
+    private bool IsPlacementAreaOverlayPreparedFor(TowerType towerType)
+    {
+        return _placementAreaOverlayPreparedRevision == _placementAreaOverlayRevision
+            && _placementAreaOverlayPreparedTowerType == towerType;
+    }
+
+    /// <summary>
+    /// 当场上已建塔发生变化时，让旧的覆盖层缓存失效。
+    ///
+    /// 这能避免玩家看到一张已经过期的合法区域图。
+    /// </summary>
+    private void InvalidatePlacementAreaOverlayCache()
+    {
+        _placementAreaOverlayRevision++;
+        _placementAreaOverlayPreparedRevision = -1;
+        _placementAreaOverlayPreparedTowerType = TowerType.None;
+    }
+
+    /// <summary>
+    /// 在拖拽真正开始时显示覆盖层。
+    ///
+    /// 如果缓存已经准备好，就只做一次重新显示；
+    /// 如果缓存还没好，才退回到现场重建，保证正确性优先。
+    /// </summary>
+    private void ShowPreparedPlacementAreaOverlay(TowerType towerType)
+    {
+        if (_placementAreaOverlayRenderer == null || _buildZone == null || _placementPreviewRoot == null)
+        {
+            return;
+        }
+
+        if (IsPlacementAreaOverlayPreparedFor(towerType))
+        {
+            _placementAreaOverlayRenderer.ShowPrepared(_placementPreviewRoot, GetPlacementOverlayWorldBounds(towerType));
+            return;
+        }
+
+        RefreshPlacementAreaOverlay(towerType);
+        _placementAreaOverlayPreparedRevision = _placementAreaOverlayRevision;
+        _placementAreaOverlayPreparedTowerType = towerType;
+    }
+
     private void RefreshPlacementAreaOverlay(TowerType towerType)
     {
         if (_placementAreaOverlayRenderer == null || !_isPlacementDragActive || towerType == TowerType.None || _buildZone == null || _placementPreviewRoot == null)
@@ -840,7 +1103,7 @@ public class TowerDefenseGame : MonoBehaviour
 
         _placementAreaOverlayRenderer.Show(
             _placementPreviewRoot,
-            _buildZone.WorldBounds,
+            GetPlacementOverlayWorldBounds(towerType),
             worldPosition => ValidatePlacementPosition(worldPosition, towerType, out _));
     }
 
@@ -887,7 +1150,13 @@ public class TowerDefenseGame : MonoBehaviour
     /// 浣嗘妸浼氱湡姝ｅ弬涓庢垬鏂楃殑琛屼负鑴氭湰绂佺敤鎺夛紝璁╁畠鍙綔涓鸿瑙夐瑙堝瓨鍦ㄣ€?    /// 杩欑鍋氭硶姣旀墜鍐欏彟涓€濂椻€滃亣棰勮妯″瀷鈥濇洿鐪佹垚鏈紝涔熸洿涓嶅鏄撳瑙傚涓嶄笂銆?    /// </summary>
     private void EnsurePlacementPreviewInstance(TowerType towerType)
     {
-        DestroyPlacementPreview();
+        if (_placementPreviewInstance != null && _placementPreviewTowerType == towerType)
+        {
+            _placementPreviewInstance.SetActive(true);
+            return;
+        }
+
+        ReleasePlacementPreviewInstance();
 
         GameObject prototype = GetPrototype(towerType);
         if (prototype == null)
@@ -896,6 +1165,7 @@ public class TowerDefenseGame : MonoBehaviour
         }
 
         _placementPreviewInstance = Instantiate(prototype, Vector3.zero, Quaternion.identity, _placementPreviewRoot);
+        _placementPreviewTowerType = towerType;
         _placementPreviewInstance.name = $"{GetTowerDisplayName(towerType)}_Preview";
         _placementPreviewInstance.SetActive(true);
 
@@ -938,10 +1208,25 @@ public class TowerDefenseGame : MonoBehaviour
             _placementPreviewRingRenderer.sortingOrder = 14;
         }
     }
-    /// <summary>
-    /// 閿€姣佸綋鍓嶆嫋鎷介瑙堝璞°€?    ///
-    /// 鍗曠嫭鎶芥垚鏂规硶涔嬪悗锛?    /// Begin / Cancel / GameOver 閮藉彲浠ュ鐢ㄥ悓涓€濂楁竻鐞嗘祦绋嬨€?    /// </summary>
+
     private void DestroyPlacementPreview()
+    {
+        if (_placementPreviewInstance != null)
+        {
+            _placementPreviewInstance.SetActive(false);
+        }
+    }
+
+    /// <summary>
+    /// 真正释放当前预览塔对象。
+    ///
+    /// 平时结束拖拽时我们只隐藏预览塔，尽量复用同塔型实例，
+    /// 以减少频繁 Instantiate / Destroy 带来的延迟 GC 抖动。
+    ///
+    /// 只有在切换到另一种塔型，或者总控自身销毁时，
+    /// 才需要真的把旧预览对象释放掉。
+    /// </summary>
+    private void ReleasePlacementPreviewInstance()
     {
         if (_placementPreviewInstance != null)
         {
@@ -949,6 +1234,7 @@ public class TowerDefenseGame : MonoBehaviour
         }
 
         _placementPreviewInstance = null;
+        _placementPreviewTowerType = TowerType.None;
         _placementPreviewSpriteRenderer = null;
         _placementPreviewRingRenderer = null;
     }
@@ -1101,6 +1387,28 @@ public class TowerDefenseGame : MonoBehaviour
 /// 杩欑鏂规涓嶆槸鏈€鏁板鍖栫殑瑙ｆ瀽瑁佸壀锛?/// 浣嗗畠鏈€澶х殑浠峰€兼槸锛?/// 鍙鍖栧拰鐪熷疄鐜╂硶姘歌繙鏉ヨ嚜鍚屼竴濂楀垽鏂€昏緫銆?/// 瀵瑰綋鍓嶅師鍨嬫湡椤圭洰鏉ヨ锛岃繖鏄潪甯稿垝绠楃殑鎶樹腑銆?/// </summary>
 public sealed class PlacementAreaOverlayRenderer : IDisposable
 {
+    /// <summary>
+    /// 在基础像素密度之上，再额外给覆盖层一点分辨率加成。
+    ///
+    /// 当前可放置区域覆盖层的边界粗糙，核心原因之一就是纹理分辨率偏低：
+    /// 同样一段世界空间边界，被投到纹理里时像素太少，就会天然出现明显台阶感。
+    ///
+    /// 这里额外乘一个温和的倍率，而不是直接把外部序列化字段调得特别夸张，
+    /// 是为了把“更平滑”作为这套覆盖层的默认品质，同时又不需要人每次手动调场景参数。
+    /// </summary>
+    private const float OverlayResolutionScale = 1.1f;
+
+    /// <summary>
+    /// 单个最终像素内部用于抗锯齿的子采样网格边长。
+    ///
+    /// 例如取值 3 时，表示每个最终像素会再细分成 3 x 3 个子采样点。
+    /// 这样我们就不再只知道“这个像素是否合法”，
+    /// 还能知道“这个像素内部有多少比例实际落在合法区域里”。
+    ///
+    /// 边界平滑感的关键，就来自这种“覆盖率”信息。
+    /// </summary>
+    private const int EdgeSupersampleGridSize = 2;
+
     private readonly float _pixelsPerUnit;
     private readonly Color _fillColor;
     private readonly Color _edgeColor;
@@ -1110,6 +1418,10 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     private SpriteRenderer _spriteRenderer;
     private Texture2D _overlayTexture;
     private Sprite _overlaySprite;
+    private bool[] _legalMaskBuffer;
+    private Color[] _pixelBuffer;
+    private int _bufferWidth;
+    private int _bufferHeight;
 
     public PlacementAreaOverlayRenderer(float pixelsPerUnit, Color fillColor, Color edgeColor, int sortingOrder)
     {
@@ -1120,8 +1432,12 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     }
 
     /// <summary>
-    /// 閲嶆柊鐢熸垚骞舵樉绀哄綋鍓嶈鐩栧浘銆?    ///
-    /// 鍙鐖惰妭鐐广€佽寖鍥存垨鍒ゅ畾鍑芥暟鏃犳晥锛屽氨鐩存帴闅愯棌锛?    /// 閬垮厤鍦ㄥ満鏅皻鏈閰嶅畬鏁存椂鐢熸垚涓€寮犳病鏈夋剰涔夌殑绌哄浘銆?    /// </summary>
+    /// 根据当前 BuildZone 世界范围和真实合法性判定，显示一张世界空间覆盖图。
+    ///
+    /// 这里仍然坚持一个非常重要的边界：
+    /// “画出来哪里能放”必须继续使用真实的 validator 来决定，
+    /// 我们只改可视化质量，不复制也不发明第二套规则。
+    /// </summary>
     public void Show(Transform parent, Bounds worldBounds, Func<Vector3, bool> validator)
     {
         if (parent == null || validator == null || worldBounds.size.x <= Mathf.Epsilon || worldBounds.size.y <= Mathf.Epsilon)
@@ -1135,15 +1451,39 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
 
         if (_overlayObject != null)
         {
-            _overlayObject.transform.position = new Vector3(worldBounds.center.x, worldBounds.center.y, 0f);
-            _overlayObject.transform.localScale = Vector3.one;
+            ApplyOverlayTransform(worldBounds);
             _overlayObject.SetActive(true);
         }
     }
 
     /// <summary>
-    /// 浠呴殣钘忚鐩栧浘锛屼絾淇濈暀瀵硅薄鍜屼笂涓€杞汗鐞嗭紝
-    /// 杩欐牱涓嬩竴娆￠噸鏂版樉绀烘椂鍙渶瑕侀噸寤哄綋鍓嶅悎娉曞尯鍗冲彲銆?    /// </summary>
+    /// 隐藏当前覆盖图，但暂时保留对象和纹理容器，方便下次继续复用。
+    /// </summary>
+
+    /// <summary>
+    /// 显示已经准备好的覆盖层，不再重复重建纹理。
+    ///
+    /// 只要缓存仍然有效，这里就只是一次轻量的显隐与位置同步，
+    /// 远比重新跑整张合法性采样便宜。
+    /// </summary>
+    public void ShowPrepared(Transform parent, Bounds worldBounds)
+    {
+        if (parent == null || worldBounds.size.x <= Mathf.Epsilon || worldBounds.size.y <= Mathf.Epsilon)
+        {
+            Hide();
+            return;
+        }
+
+        if (_overlayObject == null || _spriteRenderer == null || _spriteRenderer.sprite == null)
+        {
+            return;
+        }
+
+        EnsureOverlayObject(parent);
+        ApplyOverlayTransform(worldBounds);
+        _overlayObject.SetActive(true);
+    }
+
     public void Hide()
     {
         if (_overlayObject != null)
@@ -1153,7 +1493,8 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     }
 
     /// <summary>
-    /// 閲婃斁杩愯鏃剁敓鎴愮殑璐村浘鍜屾壙杞藉璞°€?    /// </summary>
+    /// 彻底释放覆盖层持有的纹理与精灵资源。
+    /// </summary>
     public void Dispose()
     {
         DestroyTextureResources();
@@ -1167,7 +1508,11 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     }
 
     /// <summary>
-    /// 纭繚瑕嗙洊鍥炬壙杞藉璞″瓨鍦紝骞舵寕鍒板綋鍓嶉瑙堟牴鑺傜偣涓嬨€?    /// </summary>
+    /// 确保世界空间覆盖层对象存在，并挂到预览根节点下。
+    ///
+    /// 这里继续使用 SpriteRenderer + Texture2D 的轻量方案，
+    /// 是因为它对当前原型已经足够直观，而且很容易继续在像素层面做边界优化。
+    /// </summary>
     private void EnsureOverlayObject(Transform parent)
     {
         if (_overlayObject == null)
@@ -1186,18 +1531,43 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     }
 
     /// <summary>
-    /// 鎸夊綋鍓嶅悎娉曟€у垽瀹氾紝鎶婂厑璁稿尯鍩熼噸鏂扮儤鎴愯创鍥俱€?    ///
-    /// 娴佺▼鍒嗕袱姝ワ細
-    /// 1. 鍏堥€愮偣閲囨牱锛屽緱鍒版瘡涓儚绱犱腑蹇冪偣鏄惁鍚堟硶銆?    /// 2. 鍐嶆牴鎹偦灞呭叧绯诲垽鏂摢浜涘悎娉曞儚绱犲鍦ㄨ竟缂橈紝鐢ㄦ洿浜殑棰滆壊鎻忓嚭鏉ャ€?    ///
-    /// 杩欐牱鐜╁鏃㈣兘鐪嬪埌鏁寸墖鍚堟硶鍖哄煙鐨勪綋绉紝
-    /// 涔熻兘鏇村鏄撹鍑鸿竟鐣岃疆寤撱€?    /// </summary>
+    /// 同步覆盖层对象在世界中的位置与缩放。
+    ///
+    /// 单独拆出这个方法，是为了让“重建时”和“直接显示缓存时”
+    /// 都能复用同一套摆放逻辑。
+    /// </summary>
+    private void ApplyOverlayTransform(Bounds worldBounds)
+    {
+        if (_overlayObject == null)
+        {
+            return;
+        }
+
+        _overlayObject.transform.position = new Vector3(worldBounds.center.x, worldBounds.center.y, 0f);
+        _overlayObject.transform.localScale = Vector3.one;
+    }
+
+
+    /// <summary>
+    /// 重新生成可放置区域覆盖层纹理。
+    ///
+    /// 这一版和平滑度直接相关的改动有三层：
+    /// 1. 提高基础分辨率，减少大台阶。
+    /// 2. 只对真正贴边的像素再做多重采样，兼顾平滑度与运行时成本。
+    /// 3. 纹理过滤从 Point 改为 Bilinear，让边界在屏幕上进一步柔和。
+    ///
+    /// 注意：真正的“这里能不能放”仍然只由 validator 决定。
+    /// 覆盖率只服务于边界显示质量，不改变玩法判定本身。
+    /// </summary>
     private void RebuildOverlayTexture(Bounds worldBounds, Func<Vector3, bool> validator)
     {
-        int width = Mathf.Clamp(Mathf.CeilToInt(worldBounds.size.x * _pixelsPerUnit), 32, 1024);
-        int height = Mathf.Clamp(Mathf.CeilToInt(worldBounds.size.y * _pixelsPerUnit), 32, 1024);
+        float effectivePixelsPerUnit = _pixelsPerUnit * OverlayResolutionScale;
+        int width = Mathf.Clamp(Mathf.CeilToInt(worldBounds.size.x * effectivePixelsPerUnit), 32, 1024);
+        int height = Mathf.Clamp(Mathf.CeilToInt(worldBounds.size.y * effectivePixelsPerUnit), 32, 1024);
 
-        bool[] legalMask = new bool[width * height];
-        Color[] pixels = new Color[width * height];
+        EnsureWorkingBuffers(width, height);
+        bool[] legalMask = _legalMaskBuffer;
+        Color[] pixels = _pixelBuffer;
 
         Vector3 min = worldBounds.min;
         float stepX = worldBounds.size.x / width;
@@ -1207,12 +1577,13 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
         {
             for (int x = 0; x < width; x++)
             {
-                Vector3 samplePoint = new Vector3(
+                int index = (y * width) + x;
+                Vector3 centerPoint = new Vector3(
                     min.x + (x + 0.5f) * stepX,
                     min.y + (y + 0.5f) * stepY,
                     0f);
 
-                legalMask[(y * width) + x] = validator(samplePoint);
+                legalMask[index] = validator(centerPoint);
             }
         }
 
@@ -1227,28 +1598,15 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
                     continue;
                 }
 
-                pixels[index] = HasIllegalNeighbour(legalMask, width, height, x, y)
-                    ? _edgeColor
-                    : _fillColor;
+                bool isBoundaryPixel = HasIllegalNeighbour(legalMask, width, height, x, y);
+                float coverage = isBoundaryPixel ? SamplePixelCoverage(min, stepX, stepY, x, y, validator) : 1f;
+                pixels[index] = BuildPixelColor(isBoundaryPixel, coverage);
             }
         }
 
-        DestroyTextureResources();
-
-        _overlayTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-        _overlayTexture.wrapMode = TextureWrapMode.Clamp;
-        _overlayTexture.filterMode = FilterMode.Point;
+        EnsureTextureResources(width, height, worldBounds.size.x);
         _overlayTexture.SetPixels(pixels);
         _overlayTexture.Apply(false, false);
-
-        float spritePixelsPerUnit = width / worldBounds.size.x;
-        _overlaySprite = Sprite.Create(
-            _overlayTexture,
-            new Rect(0f, 0f, width, height),
-            new Vector2(0.5f, 0.5f),
-            spritePixelsPerUnit,
-            0,
-            SpriteMeshType.FullRect);
 
         if (_spriteRenderer != null)
         {
@@ -1256,10 +1614,111 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
         }
     }
 
+
+    private void EnsureWorkingBuffers(int width, int height)
+    {
+        if (_legalMaskBuffer == null || _pixelBuffer == null || _bufferWidth != width || _bufferHeight != height)
+        {
+            _legalMaskBuffer = new bool[width * height];
+            _pixelBuffer = new Color[width * height];
+            _bufferWidth = width;
+            _bufferHeight = height;
+        }
+    }
+
     /// <summary>
-    /// 鍒ゆ柇涓€涓悎娉曞儚绱犲懆鍥存槸鍚︽尐鐫€闈炴硶鍖哄煙銆?    ///
-    /// 鍙鐩搁偦鍏牸閲屾湁浠绘剰涓€鏍奸潪娉曪紝
-    /// 灏辨妸褰撳墠鍍忕礌褰撲綔杈圭紭锛岀敤鏇翠寒鐨勯鑹叉樉绀恒€?    /// </summary>
+    /// 确保覆盖层使用的 Texture2D / Sprite 资源已经就绪。
+    ///
+    /// 如果尺寸没变，就继续复用上一轮的纹理和 Sprite；
+    /// 只有真正发生尺寸变化时，才释放旧资源并创建新资源。
+    ///
+    /// 由于当前 BuildZone 尺寸基本稳定，这意味着大多数重建都不再分配新的引擎对象。
+    /// </summary>
+    private void EnsureTextureResources(int width, int height, float worldWidth)
+    {
+        if (_overlayTexture != null && _overlaySprite != null && _overlayTexture.width == width && _overlayTexture.height == height)
+        {
+            return;
+        }
+
+        DestroyTextureResources();
+
+        _overlayTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        _overlayTexture.wrapMode = TextureWrapMode.Clamp;
+        _overlayTexture.filterMode = FilterMode.Bilinear;
+
+        float spritePixelsPerUnit = width / worldWidth;
+        _overlaySprite = Sprite.Create(
+            _overlayTexture,
+            new Rect(0f, 0f, width, height),
+            new Vector2(0.5f, 0.5f),
+            spritePixelsPerUnit,
+            0,
+            SpriteMeshType.FullRect);
+    }
+
+    private static float SamplePixelCoverage(
+        Vector3 min,
+        float stepX,
+        float stepY,
+        int x,
+        int y,
+        Func<Vector3, bool> validator)
+    {
+        int legalSampleCount = 0;
+        int totalSampleCount = EdgeSupersampleGridSize * EdgeSupersampleGridSize;
+
+        for (int sampleY = 0; sampleY < EdgeSupersampleGridSize; sampleY++)
+        {
+            for (int sampleX = 0; sampleX < EdgeSupersampleGridSize; sampleX++)
+            {
+                float normalizedX = (sampleX + 0.5f) / EdgeSupersampleGridSize;
+                float normalizedY = (sampleY + 0.5f) / EdgeSupersampleGridSize;
+
+                Vector3 samplePoint = new Vector3(
+                    min.x + (x + normalizedX) * stepX,
+                    min.y + (y + normalizedY) * stepY,
+                    0f);
+
+                if (validator(samplePoint))
+                {
+                    legalSampleCount++;
+                }
+            }
+        }
+
+        return (float)legalSampleCount / totalSampleCount;
+    }
+
+    /// <summary>
+    /// 根据“是否边界像素”和“覆盖率”组装最终颜色。
+    ///
+    /// 这里的核心思路是：
+    /// - 内部像素更接近 fillColor
+    /// - 边界像素更接近 edgeColor
+    /// - 透明度再根据覆盖率做平滑衰减
+    ///
+    /// 这样玩家仍然能清楚看出边界位置，
+    /// 但它不再是一圈生硬的块状描边，而会更接近柔和的区域轮廓。
+    /// </summary>
+    private Color BuildPixelColor(bool isBoundaryPixel, float coverage)
+    {
+        float boundaryBlend = isBoundaryPixel
+            ? Mathf.Lerp(0.25f, 0.65f, 1f - coverage)
+            : 0f;
+
+        Color baseColor = Color.Lerp(_fillColor, _edgeColor, boundaryBlend);
+        float softenedAlpha = baseColor.a * Mathf.SmoothStep(0f, 1f, coverage);
+        baseColor.a = softenedAlpha;
+        return baseColor;
+    }
+
+    /// <summary>
+    /// 判断当前像素是否贴着非法区域。
+    ///
+    /// 这里只看 8 邻域，已经足够提供一圈稳定的“边界感”。
+    /// 而真正让边界柔和起来的工作，则交给上面的 coverage 和颜色混合来完成。
+    /// </summary>
     private static bool HasIllegalNeighbour(bool[] legalMask, int width, int height, int x, int y)
     {
         for (int offsetY = -1; offsetY <= 1; offsetY++)
@@ -1289,7 +1748,8 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     }
 
     /// <summary>
-    /// 閿€姣佷笂涓€杞繍琛屾椂鐢熸垚鐨勭汗鐞嗗拰 Sprite锛岄伩鍏嶅唴瀛樹竴鐩寸疮绉€?    /// </summary>
+    /// 释放当前覆盖层使用的临时纹理与 Sprite 资源。
+    /// </summary>
     private void DestroyTextureResources()
     {
         if (_overlaySprite != null)
@@ -1302,6 +1762,11 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
         {
             UnityEngine.Object.Destroy(_overlayTexture);
             _overlayTexture = null;
+
+        _legalMaskBuffer = null;
+        _pixelBuffer = null;
+        _bufferWidth = 0;
+        _bufferHeight = 0;
         }
     }
 }

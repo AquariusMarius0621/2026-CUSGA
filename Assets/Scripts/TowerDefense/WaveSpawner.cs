@@ -188,7 +188,7 @@ public class WaveSpawner : MonoBehaviour
         {
             if (!_levelClearMessageShown && Enemy.ActiveEnemyCount == 0 && TowerDefenseGame.Instance != null)
             {
-                TowerDefenseGame.Instance.SetStatusMessage("测试关卡完成！你成功守住了基地。");
+                TowerDefenseGame.Instance.SetStatusMessage("Test level complete! The base survived.");
                 _levelClearMessageShown = true;
             }
 
@@ -211,12 +211,12 @@ public class WaveSpawner : MonoBehaviour
 
             if (_waitingForFirstWave)
             {
-                TowerDefenseGame.Instance.SetStatusMessage($"第 {_currentWaveIndex + 1} 波来袭，守住基地！");
+                TowerDefenseGame.Instance.SetStatusMessage($"Wave {_currentWaveIndex + 1} incoming. Hold the line!");
                 _waitingForFirstWave = false;
             }
             else
             {
-                TowerDefenseGame.Instance.SetStatusMessage($"第 {_currentWaveIndex + 1} 波开始！");
+                TowerDefenseGame.Instance.SetStatusMessage($"Wave {_currentWaveIndex + 1} started.");
             }
         }
 
@@ -238,7 +238,7 @@ public class WaveSpawner : MonoBehaviour
 
             if (TowerDefenseGame.Instance != null)
             {
-                TowerDefenseGame.Instance.SetStatusMessage($"第 {_currentWaveIndex} 波已刷完，准备下一波。");
+                TowerDefenseGame.Instance.SetStatusMessage($"Wave {_currentWaveIndex} cleared. Prepare for the next one.");
             }
         }
         else

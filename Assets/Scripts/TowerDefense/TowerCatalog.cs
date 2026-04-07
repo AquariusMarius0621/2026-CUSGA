@@ -97,7 +97,7 @@ public sealed class TowerDefinition
         string accentHex = ColorUtility.ToHtmlStringRGB(AccentColor);
         return
             $"{DisplayName.ToUpperInvariant()}\n" +
-            $"<size=20><color=#9FB4C8>{CardRoleSummary} • GRID {ExpansionSquareSize:0.0}</color></size>\n" +
+            $"<size=20><color=#9FB4C8>{CardRoleSummary} / GRID {ExpansionSquareSize:0.0}</color></size>\n" +
             $"<size=32><color=#{accentHex}>{BuildCost} EN</color></size>";
     }
 }

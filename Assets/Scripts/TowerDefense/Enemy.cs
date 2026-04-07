@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -67,6 +67,18 @@ public class Enemy : MonoBehaviour
     /// 敌人主体的 SpriteRenderer 缓存。
     /// </summary>
     private SpriteRenderer _spriteRenderer;
+
+    /// <summary>
+    /// 血条根节点。
+    ///
+    /// 这里单独缓存整个根节点，而不是只记住 Fill，
+    /// 是因为后续除了更新血量比例，还需要在某些全局状态下“一键隐藏整条血条”。
+    ///
+    /// 最典型的场景就是 Game Over：
+    /// 玩家已经进入结算界面时，继续显示敌人头顶的绿色血条只会污染 UI，
+    /// 所以直接隐藏整个 HealthBarRoot 会比逐个关子节点更稳、更清楚。
+    /// </summary>
+    private Transform _healthBarRoot;
 
     /// <summary>
     /// 血条填充节点的 Transform。
@@ -140,12 +152,33 @@ public class Enemy : MonoBehaviour
     }
 
     /// <summary>
+    /// 控制敌人头顶血条的整体显隐。
+    ///
+    /// 这里专门由 Enemy 自己对外提供入口，
+    /// 是为了把“血条挂在哪里、由哪些子节点组成”继续封装在敌人内部。
+    ///
+    /// 这样总控层只需要表达业务意图：
+    /// “现在进入 Game Over 了，把场上敌人的血条都收起来”，
+    /// 而不需要自己深入到场景树里找 HealthBarRoot/HealthBarFill 这些实现细节。
+    /// </summary>
+    public void SetHealthBarVisible(bool visible)
+    {
+        CacheReferences();
+
+        if (_healthBarRoot != null)
+        {
+            _healthBarRoot.gameObject.SetActive(visible);
+        }
+    }
+
+    /// <summary>
     /// 初始化组件引用并应用默认外观。
     /// </summary>
     private void Awake()
     {
         CacheReferences();
         ApplyVisualTheme();
+        SetHealthBarVisible(true);
     }
 
     /// <summary>
@@ -342,9 +375,14 @@ public class Enemy : MonoBehaviour
             _spriteRenderer = GetComponent<SpriteRenderer>();
         }
 
-        if (_healthBarFill == null)
+        if (_healthBarRoot == null)
         {
-            _healthBarFill = transform.Find("HealthBarRoot/HealthBarFill");
+            _healthBarRoot = transform.Find("HealthBarRoot");
+        }
+
+        if (_healthBarRoot != null && _healthBarFill == null)
+        {
+            _healthBarFill = _healthBarRoot.Find("HealthBarFill");
         }
 
         if (_healthBarFill != null && _healthBarFillRenderer == null)
@@ -354,7 +392,7 @@ public class Enemy : MonoBehaviour
 
         if (_healthBarBackgroundRenderer == null)
         {
-            Transform background = transform.Find("HealthBarRoot/HealthBarBackground");
+            Transform background = _healthBarRoot != null ? _healthBarRoot.Find("HealthBarBackground") : null;
             if (background != null)
             {
                 _healthBarBackgroundRenderer = background.GetComponent<SpriteRenderer>();

@@ -53,7 +53,7 @@ public class TowerShopCard : MonoBehaviour,
     /// 这条提示不属于核心规则本身，
     /// 但它能显著降低第一次试玩时的理解门槛。
     /// </summary>
-    [SerializeField] private string hoverHint = "拖拽卡片时会显示当前塔的精确可部署区域；首塔先从初始部署区起手。";
+    [SerializeField] private string hoverHint = "Drag the card to preview exact legal areas. Your first structure starts in the starter zone.";
 
     [Header("Drag Feedback")]
 
@@ -208,6 +208,10 @@ public class TowerShopCard : MonoBehaviour,
             return;
         }
 
+        // 悬停卡片通常会早于真正开始拖拽，
+        // 所以这里顺手请求一次覆盖层预热，能把最重的重建成本尽量前移，
+        // 减少玩家在“刚抓起卡片那一下”感受到的卡顿。
+        TowerDefenseGame.Instance.PrewarmPlacementAreaOverlay(towerType);
         TowerDefenseGame.Instance.SetStatusMessage(hoverHint);
     }
 

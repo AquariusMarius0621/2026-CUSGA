@@ -1,5 +1,5 @@
 ﻿# Tower Defense Project Structure Overview
-Updated: 2026-03-31
+Updated: 2026-04-02
 Audience: 给项目维护者看的结构说明文档。
 Goal: 用更好读的方式讲清楚当前项目由哪些场景、脚本、UI、文档和工具组成，以及它们怎么协作。
 
@@ -36,6 +36,7 @@ Goal: 用更好读的方式讲清楚当前项目由哪些场景、脚本、UI、
 - 玩法总控对象
 
 如果你想改真正的塔防玩法，大多数时候都会回到这个场景。
+当前玩法 HUD 与主菜单 UI 对象也都已经切到 Unity 的 `UI` Layer，方便你在 Scene 视图右上角用 `Layers` 过滤只看界面。
 
 ## 3. 核心脚本分工
 ### `TowerDefenseGame.cs`
@@ -188,6 +189,14 @@ Unity 版本锁定，目前项目使用 `2022.3.62f3c1`。
 ### `docs/ai-memory/td-memory-rules-and-history.md`
 规范、历史和路线图文档。
 
+### `docs/ai-memory/td-agent-development-playbook.md`
+这是给未来维护者和智能体接手开发时使用的长期执行手册。
+它不是单纯记录“当前项目是什么样”，而是详细说明：
+- 应该按什么阶段继续开发
+- 塔防关卡如何演进成多关卡结构
+- 2D 横板剧情场景该如何接进来
+- 主菜单、剧情场景、塔防关卡之间的切换应该怎样实现
+
 ### `docs/ai-memory/td-project-file-guide.md`
 持续维护用的文件指南。
 它更偏“索引表”和“维护规则”。
@@ -231,6 +240,9 @@ Unity 版本锁定，目前项目使用 `2022.3.62f3c1`。
 你以后如果只是想快速判断“某个东西该去哪里改”，优先看这份文档。
 如果你想看更像索引表、并且带维护约束的版本，就看：
 - `docs/ai-memory/td-project-file-guide.md`
+
+如果你想继续扩这个项目，尤其是想加入更多塔防关卡、横板剧情场景，或者想搞清楚后续推荐的开发顺序，就优先再看：
+- `docs/ai-memory/td-agent-development-playbook.md`
 
 如果你发现：
 - 新增了关键脚本
