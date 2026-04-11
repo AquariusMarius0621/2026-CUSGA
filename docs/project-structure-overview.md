@@ -181,3 +181,12 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
 - 当前职责边界可以这样记：
   - “能不能放”继续看 `TowerDefenseGame.cs`
   - “拖拽时看见什么”优先看这 3 个新文件
+
+## 13. 2026-04-11 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerPlacementRules.cs`
+  这是第二轮组件化新增的放置规则组件。起手区、扩张部署网络、阻挡器、塔间距和覆盖层扫描边界现在都优先从这里看。
+- 当前职责边界更新为：
+  - “能不能放”优先看 `TowerPlacementRules.cs`
+  - “拖拽时看见什么”优先看 `TowerPlacementVisualController.cs`
+  - `TowerDefenseGame.cs` 继续负责总协调、资源扣减、真正建塔和 HUD 刷新入口

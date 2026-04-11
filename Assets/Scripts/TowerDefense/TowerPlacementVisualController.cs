@@ -206,10 +206,16 @@ public sealed class TowerPlacementVisualController : IDisposable
     /// 2. 切换塔型时才真正释放旧对象。
     /// 3. 预览对象上的战斗脚本和碰撞体全部关掉，保证它永远只承担视觉职责。
     /// </summary>
-    public void EnsurePlacementPreviewInstance(TowerType towerType)
+    public void EnsurePlacementPreviewInstance(TowerType towerType, Vector3 initialWorldPosition)
     {
         if (_placementPreviewInstance != null && _placementPreviewTowerType == towerType)
         {
+            // 同塔型复用时，也先把位置对到这次拖拽真正的起始鼠标世界坐标，
+            // 再重新激活对象。
+            //
+            // 这样可以避免“上一次停在 A 点的隐藏预览塔，
+            // 这一次先在旧位置或世界原点闪一帧，再跳到鼠标下面”的视觉抖动。
+            _placementPreviewInstance.transform.position = initialWorldPosition;
             _placementPreviewInstance.SetActive(true);
             return;
         }
@@ -227,7 +233,15 @@ public sealed class TowerPlacementVisualController : IDisposable
             return;
         }
 
-        _placementPreviewInstance = UnityEngine.Object.Instantiate(prototype, Vector3.zero, Quaternion.identity, _placementPreviewRoot);
+        // 这里不再把预览塔先生成在世界原点，再等下一步 Update 去挪。
+        //
+        // 原来的顺序会导致一个典型闪帧：
+        // 1. 预览塔先在 (0,0,0) 被实例化并显示
+        // 2. 紧接着下一次 `UpdatePlacementDrag()` 才把它搬到鼠标位置
+        // 于是玩家第一次拖卡时，会看到地图中央短暂闪过一次预览塔
+        //
+        // 现在直接用拖拽起始点作为实例化位置，让它“第一次出现就出现在正确位置”。
+        _placementPreviewInstance = UnityEngine.Object.Instantiate(prototype, initialWorldPosition, Quaternion.identity, _placementPreviewRoot);
         _placementPreviewTowerType = towerType;
         _placementPreviewInstance.name = $"{_getTowerDisplayName(towerType)}_Preview";
         _placementPreviewInstance.SetActive(true);

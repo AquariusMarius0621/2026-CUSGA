@@ -80,6 +80,18 @@ public class TowerShopCard : MonoBehaviour,
     private bool _isDragging;
 
     /// <summary>
+    /// 记录“Unity 已经进入拖拽手势，但我们还没真正启动放置拖拽链”的过渡状态。
+    ///
+    /// 这次修复的核心就是把“Unity 开始认定是拖拽”和“我们正式创建放置预览塔”
+    /// 拆成两个阶段：
+    /// 1. `OnBeginDrag` 只记录候选状态
+    /// 2. 第一次 `OnDrag` 到来时，再用最新鼠标位置正式启动放置拖拽
+    ///
+    /// 这样可以避免第一次只是轻微点按/抖动时，就在地图中央提前实例化一个不跟手的预览塔。
+    /// </summary>
+    private bool _isAwaitingPlacementDragStart;
+
+    /// <summary>
     /// 濮捬呭У閻栵綀銇愰幘鍐差枀闁哄嫷鍨伴幆渚€骞冮鈧禒鐘诲捶閵娿劎绠圭€殿喚濮村畷杈ㄧ▔婵炲簱鍋?    ///
     /// 閺夆晜鐟ら柌婊堝冀閸ヮ亶鍞堕悹浣叉櫆閸ㄦ粍绂掗鈧ぐ鍙夌閵夈儲韬?Update 闂佹彃鑻ぐ褏鈧潧婀卞﹢鈥愁潰閿濆牜娼堕柛蹇氭珪閺佺偤鎯冮崟顐㈠耿闁绘娲﹂幐閬嶅绩閹规劒姘﹂梺鎻掔箰閹崇娀宕ョ粙鍨楅柡浣哥墑閳?    /// </summary>
     private bool _isPointerOver;
@@ -122,7 +134,18 @@ public class TowerShopCard : MonoBehaviour,
     /// 鐟滅増鎹囩槐鍫曞冀閸ャ劌鐦诲☉鎾愁儎缁茬偓娼诲Ο鑽ゆ⒕闁活亞鍠愰婊勬交濞戞ê寮抽柟閿嬬墬鐎氬潡姊奸崼婵冨亾閻撳骸顤呴柨娑樺鐎靛矂宕濋妸銉ュ綘闂傚偆鍙冪划顖滄媼閵堝棗鐝涢柟铚傜矙濡插洭宕愮粭琛″亾?    /// </summary>
     public void OnInitializePotentialDrag(PointerEventData eventData)
     {
-        eventData.useDragThreshold = false;
+        // 这里明确保留 Unity 自带的拖拽阈值。
+        //
+        // 之前把阈值强行关掉后，鼠标一次很轻的点击抖动就可能被判成“开始拖拽”，
+        // 于是玩家第一次只是想点一下部署卡，也会提前生成预览塔，
+        // 看起来就像“卡片一点击，地图中间先冒出一个不能动的放置示意画面”。
+        //
+        // 保留阈值后的交互边界会更符合直觉：
+        // - 轻点：走 OnPointerClick，做“选中该塔型”
+        // - 真正拖动：跨过阈值后才进入 OnBeginDrag，开始跟手拖拽
+        //
+        // 这样可以把“点击选择”和“拖拽放置”重新分开，避免第一次点击就误触发拖拽链。
+        eventData.useDragThreshold = true;
     }
 
     /// <summary>
@@ -177,24 +200,50 @@ public class TowerShopCard : MonoBehaviour,
             return;
         }
 
-        if (!TowerDefenseGame.Instance.BeginPlacementDrag(towerType, eventData.position))
-        {
-            return;
-        }
-
-        _isDragging = true;
-        _canvasGroup.alpha = draggingAlpha;
-        _canvasGroup.blocksRaycasts = false;
-        transform.localScale = _originalScale * draggingScaleMultiplier;
+        // 不在这里立刻启动真正的放置拖拽。
+        //
+        // `OnBeginDrag` 只说明 Unity 认定这次输入已经跨过拖拽阈值，
+        // 但这时鼠标位置、UI 射线状态和玩家真实意图都还处在一个“刚开始切换”的边缘帧。
+        // 之前在这里马上调用 `BeginPlacementDrag()`，就会出现：
+        // - 第一次点卡片时预览塔先被创建
+        // - 如果后续没有稳定进入持续拖拽，预览塔就停在默认位置不动
+        //
+        // 所以这里先只记一个“等待真正开始放置拖拽”的标志，
+        // 把正式启动延后到第一次 `OnDrag`。
+        _isAwaitingPlacementDragStart = true;
     }
 
     /// <summary>
     /// 闁归攱鐗楃€氭寧娼婚崶鈹炬煠濞戞搩鍙忕槐婵嬪箰娴ｈ櫣鏁鹃柟璺猴工缂嶅宕滃澶岀倞闁哄秴娲ｇ紞鍛磾椤斿吋鍊辨慨婵勫劤缁即骞€缂佹ê浠橀柕?    /// </summary>
     public void OnDrag(PointerEventData eventData)
     {
-        if (!_isDragging || TowerDefenseGame.Instance == null)
+        if (TowerDefenseGame.Instance == null)
         {
             return;
+        }
+
+        if (!_isDragging)
+        {
+            if (!_isAwaitingPlacementDragStart || eventData.button != PointerEventData.InputButton.Left || !HasConfiguredTowerType())
+            {
+                return;
+            }
+
+            // 直到真正收到第一帧 Drag，我们才正式创建预览塔并切换卡片视觉。
+            //
+            // 这样第一次真实拖卡时仍然能立即跟手，
+            // 但第一次只是点击或轻微误触时，不会再在地图中央留下一个“冻结”的预览塔。
+            if (!TowerDefenseGame.Instance.BeginPlacementDrag(towerType, eventData.position))
+            {
+                _isAwaitingPlacementDragStart = false;
+                return;
+            }
+
+            _isDragging = true;
+            _isAwaitingPlacementDragStart = false;
+            _canvasGroup.alpha = draggingAlpha;
+            _canvasGroup.blocksRaycasts = false;
+            transform.localScale = _originalScale * draggingScaleMultiplier;
         }
 
         TowerDefenseGame.Instance.UpdatePlacementDrag(eventData.position);
@@ -204,8 +253,11 @@ public class TowerShopCard : MonoBehaviour,
     /// 鐟滅増鎸剧敮铏光偓纭呭煐濠㈡顕ｉ埀顒佄楅悩宕囧灱闁哄啳顔愮槐婵堢磼閹惧瓨灏嗛柡鍫墯椤愬ジ鏌堥妸褑顔夐柟閿嬬墬鐎氬潡濡?    /// </summary>
     public void OnEndDrag(PointerEventData eventData)
     {
+        _isAwaitingPlacementDragStart = false;
+
         if (!_isDragging)
         {
+            RestoreVisualState();
             return;
         }
 
@@ -285,6 +337,7 @@ public class TowerShopCard : MonoBehaviour,
     private void OnDisable()
     {
         _isDragging = false;
+        _isAwaitingPlacementDragStart = false;
         _isPointerOver = false;
         RestoreVisualState();
     }
