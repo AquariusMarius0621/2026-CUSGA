@@ -33,6 +33,7 @@ public sealed class TowerPlacementInteractionController
     public delegate bool PlacementValidator(Vector3 worldPosition, TowerType towerType, out string invalidReason);
 
     private readonly Func<bool> _isGameOverQuery;
+    private readonly Func<int> _currentEnergyQuery;
     private readonly Func<TowerType, bool> _canAffordTower;
     private readonly Func<TowerType, GameObject> _getPrototype;
     private readonly Func<TowerType, string> _getTowerDisplayName;
@@ -63,6 +64,7 @@ public sealed class TowerPlacementInteractionController
 
     public TowerPlacementInteractionController(
         Func<bool> isGameOverQuery,
+        Func<int> currentEnergyQuery,
         Func<TowerType, bool> canAffordTower,
         Func<TowerType, GameObject> getPrototype,
         Func<TowerType, string> getTowerDisplayName,
@@ -75,6 +77,7 @@ public sealed class TowerPlacementInteractionController
         Action<string> logPlacementDiagnostic)
     {
         _isGameOverQuery = isGameOverQuery;
+        _currentEnergyQuery = currentEnergyQuery;
         _canAffordTower = canAffordTower;
         _getPrototype = getPrototype;
         _getTowerDisplayName = getTowerDisplayName;
@@ -209,7 +212,8 @@ public sealed class TowerPlacementInteractionController
         {
             _selectedTowerType = towerType;
             _refreshHud?.Invoke();
-            _setStatusMessage?.Invoke("Not enough energy. You currently have too little EN.");
+            int currentEnergy = _currentEnergyQuery != null ? _currentEnergyQuery() : 0;
+            _setStatusMessage?.Invoke($"Not enough energy. You currently have {currentEnergy} EN.");
             _logPlacementDiagnostic?.Invoke($"Begin drag rejected: insufficient energy for {towerType}.");
             return false;
         }
@@ -226,6 +230,7 @@ public sealed class TowerPlacementInteractionController
         _selectedTowerType = towerType;
         _dragTowerType = towerType;
         _isPlacementDragActive = true;
+        _refreshHud?.Invoke();
 
         Vector3 initialPreviewWorldPosition = _screenToWorldPosition != null
             ? _screenToWorldPosition(screenPosition)
@@ -298,6 +303,8 @@ public sealed class TowerPlacementInteractionController
             _tryPlaceTowerAt?.Invoke(worldPosition, towerType);
             return;
         }
+
+        _refreshHud?.Invoke();
 
         if (releasedOverUserInterface)
         {

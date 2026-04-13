@@ -1,5 +1,5 @@
 ﻿# Tower Defense Project Structure Overview
-Updated: 2026-04-07
+Updated: 2026-04-13
 Audience: 缁欓」鐩淮鎶よ€呯湅鐨勭粨鏋勮鏄庢枃妗ｃ€?Goal: 鐢ㄦ洿濂借鐨勬柟寮忚娓呮褰撳墠椤圭洰鐢卞摢浜涘満鏅€佽剼鏈€乁I銆佹枃妗ｅ拰宸ュ叿缁勬垚锛屼互鍙婂畠浠€庝箞鍗忎綔銆?
 ## 1. 涓€鍙ヨ瘽鐞嗚В杩欎釜椤圭洰
 杩欐槸涓€涓?Unity 2022.3 鐨?2D 濉旈槻鍘熷瀷椤圭洰銆?褰撳墠鏍稿績鐗硅壊鏄細
@@ -200,3 +200,22 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - “拖拽时看见什么”优先看 `TowerPlacementVisualController.cs`
   - “玩家怎么完成整条放置交互流程”优先看 `TowerPlacementInteractionController.cs`
   - `TowerDefenseGame.cs` 继续做整局总协调、资源扣减、真正实例化塔和 HUD 总刷新入口
+
+## 15. 2026-04-13 结构补充
+
+- 这一轮不是只“新增了 `TowerPlacementInteractionController.cs` 文件”，而是把它真正接到了主玩法链路上。
+- 当前 `TowerDefenseGame.cs` 已不再自己保存以下交互临时状态：
+  - 当前选中的塔型
+  - 是否处于拖拽放置中
+  - 当前拖拽塔型
+  - 当前预览点是否合法，以及失败原因
+- 这些状态现在都由 `TowerPlacementInteractionController.cs` 持有和推进，所以以后如果你要改：
+  - 点击卡片后的选中行为
+  - 拖拽开始的时机
+  - 快速点击放置
+  - 取消部署后的状态回退
+  就应该优先看 `TowerPlacementInteractionController.cs`。
+- `TowerDefenseGame.cs` 现在更适合作为：
+  - 整局总协调入口
+  - 真正建塔与扣费的执行层
+  - 规则、可视化、HUD 三条链路之间的装配层

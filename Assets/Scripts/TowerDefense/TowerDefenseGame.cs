@@ -105,12 +105,6 @@ public class TowerDefenseGame : MonoBehaviour
     private int _currentWave;
     private int _totalWaves;
     private bool _isGameOver;
-    private TowerType _selectedTowerType = TowerType.None;
-    private bool _isPlacementDragActive;
-    private TowerType _dragTowerType = TowerType.None;
-    private Vector3 _previewWorldPosition;
-    private bool _previewPositionIsValid;
-    private string _previewInvalidReason = string.Empty;
 
     private GameObject _relayTowerPrototype;
     private GameObject _defenseTowerPrototype;
@@ -126,8 +120,12 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private TowerPlacementVisualController _placementVisualController;
 
-
-
+    /// <summary>
+    /// `_placementInteractionController` 负责“玩家怎样进入放置流程、怎样更新流程、怎样结束流程”。
+    /// 这一轮把交互状态从总控里迁出去后，
+    /// `TowerDefenseGame` 更明确地退回到“整局编排 + 真正建塔 + HUD 刷新入口”的职责边界。
+    /// </summary>
+    private TowerPlacementInteractionController _placementInteractionController;
 
     /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
@@ -227,7 +225,10 @@ public class TowerDefenseGame : MonoBehaviour
             return false;
         }
 
-        return TryPlaceTowerAt(pad.GetBuildPosition(), _selectedTowerType, pad);
+        TowerType selectedTowerType = _placementInteractionController != null
+            ? _placementInteractionController.SelectedTowerType
+            : TowerType.None;
+        return TryPlaceTowerAt(pad.GetBuildPosition(), selectedTowerType, pad);
     }
 
     /// <summary>
@@ -236,52 +237,8 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public bool BeginPlacementDrag(TowerType towerType, Vector2 screenPosition)
     {
-        if (_isGameOver || towerType == TowerType.None)
-        {
-            return false;
-        }
-
-        if (!CanAffordTower(towerType))
-        {
-            _selectedTowerType = towerType;
-            RefreshHud();
-            SetStatusMessage($"Not enough energy. You currently have {_currentEnergy} EN.");
-            LogPlacementDiagnostic($"Begin drag rejected: insufficient energy for {towerType}. currentEnergy={_currentEnergy}");
-            return false;
-        }
-
-        GameObject prototype = GetPrototype(towerType);
-        if (prototype == null)
-        {
-            SetStatusMessage("Card prototype is missing. Check the scene setup.");
-            LogPlacementDiagnostic($"Begin drag rejected: missing prototype for {towerType}.");
-            return false;
-        }
-
-        CancelPlacementDragInternal();
-
-        _selectedTowerType = towerType;
-        _dragTowerType = towerType;
-        _isPlacementDragActive = true;
-
-        // 预览塔第一次出现时，就应该直接落在“当前鼠标对应的世界坐标”。
-        //
-        // 之前这里先让可视化层创建预览对象，再在下一步 `UpdatePlacementDrag()` 里挪位置，
-        // 会带来一个很典型的首帧闪烁问题：
-        // - 预览塔先短暂出现在默认位置（通常是世界原点附近 / 地图中央）
-        // - 紧接着才跳到鼠标下面
-        //
-        // 所以现在把拖拽起始世界坐标提前算出来，并在创建预览塔时直接喂进去，
-        // 让“第一次出现”与“正确位置”合并成同一帧。
-        Vector3 initialPreviewWorldPosition = ScreenToWorldPosition(screenPosition);
-        EnsurePlacementPreviewInstance(towerType, initialPreviewWorldPosition);
-        _hudPresenter.SetDragPreviewVisible(true);
-        ShowPreparedPlacementAreaOverlay(towerType);
-        RefreshHud();
-        UpdatePlacementDrag(screenPosition);
-        SetStatusMessage("Drag the Generator or Turret into a highlighted legal area, then release to deploy.");
-        LogPlacementDiagnostic($"Begin drag accepted: tower={towerType} screen={screenPosition} previewWorld={_previewWorldPosition} previewValid={_previewPositionIsValid} reason={_previewInvalidReason}");
-        return true;
+        return _placementInteractionController != null &&
+               _placementInteractionController.BeginPlacementDrag(towerType, screenPosition);
     }
 
     /// <summary>
@@ -290,18 +247,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void UpdatePlacementDrag(Vector2 screenPosition)
     {
-        if (!_isPlacementDragActive)
-        {
-            return;
-        }
-
-        _previewWorldPosition = ScreenToWorldPosition(screenPosition);
-        _previewPositionIsValid = ValidatePlacementPosition(_previewWorldPosition, _dragTowerType, out _previewInvalidReason);
-
-        _placementVisualController?.SetPreviewPosition(_previewWorldPosition);
-        UpdatePlacementPreviewVisual();
-        _hudPresenter.UpdateDragPreviewPanel(screenPosition, CreateDragPreviewState(), _towerCatalog);
-        RefreshHud();
+        _placementInteractionController?.UpdatePlacementDrag(screenPosition);
     }
 
     /// <summary>
@@ -310,36 +256,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void EndPlacementDrag(Vector2 screenPosition, bool releasedOverUserInterface)
     {
-        if (!_isPlacementDragActive)
-        {
-            return;
-        }
-
-        UpdatePlacementDrag(screenPosition);
-
-        TowerType towerType = _dragTowerType;
-        Vector3 worldPosition = _previewWorldPosition;
-        bool canPlace = _previewPositionIsValid && !releasedOverUserInterface;
-        string invalidReason = _previewInvalidReason;
-
-        LogPlacementDiagnostic($"End drag: tower={towerType} screen={screenPosition} world={worldPosition} previewValid={_previewPositionIsValid} releasedOverUi={releasedOverUserInterface} reason={invalidReason}");
-
-        CancelPlacementDragInternal();
-
-        if (canPlace)
-        {
-            TryPlaceTowerAt(worldPosition, towerType);
-            return;
-        }
-
-        if (releasedOverUserInterface)
-        {
-            SetStatusMessage("Deployment cancelled.");
-        }
-        else if (!string.IsNullOrEmpty(invalidReason))
-        {
-            SetStatusMessage(invalidReason);
-        }
+        _placementInteractionController?.EndPlacementDrag(screenPosition, releasedOverUserInterface);
     }
 
 
@@ -349,8 +266,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void CancelPlacementDrag()
     {
-        CancelPlacementDragInternal();
-        RefreshHud();
+        _placementInteractionController?.CancelPlacementDrag();
     }
 
     /// <summary>
@@ -414,7 +330,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void SelectRelayTower()
     {
-        SelectTower(TowerType.Relay);
+        _placementInteractionController?.SelectRelayTower();
     }
 
     /// <summary>
@@ -422,7 +338,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void SelectDefenseTower()
     {
-        SelectTower(TowerType.Defense);
+        _placementInteractionController?.SelectDefenseTower();
     }
 
     /// <summary>
@@ -431,8 +347,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void ClearSelection()
     {
-        CancelPlacementDragInternal();
-        SelectTower(TowerType.None);
+        _placementInteractionController?.ClearSelection();
     }
 
     /// <summary>
@@ -476,19 +391,17 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void HandleQuickPlacementInput()
     {
-        if (_isGameOver || _isPlacementDragActive || _selectedTowerType == TowerType.None)
+        if (_isGameOver || _placementInteractionController == null)
         {
             return;
         }
-
-
 
         if (!Input.GetMouseButtonDown(0) || IsPointerOverUserInterface())
         {
             return;
         }
 
-        TryPlaceTowerAt(GetMouseWorldPosition(), _selectedTowerType);
+        _placementInteractionController.TryQuickPlacementAt(GetMouseWorldPosition());
     }
 
 
@@ -526,32 +439,6 @@ public class TowerDefenseGame : MonoBehaviour
 
 
     /// <summary>
-    /// 切换当前选中的塔型。
-    /// 这里不仅会改内部选择状态，还会同步状态提示、预热合法区域覆盖层，并刷新 HUD。
-    /// </summary>
-    private void SelectTower(TowerType towerType)
-    {
-        if (_isGameOver)
-        {
-            return;
-        }
-
-        _selectedTowerType = towerType;
-
-        if (towerType == TowerType.None)
-        {
-            SetStatusMessage("Deployment selection cleared.");
-        }
-        else
-        {
-            SetStatusMessage($"Selected: {GetTowerDisplayName(towerType)}. Drag the card to preview exact legal areas.");
-            PrewarmPlacementAreaOverlay(towerType);
-        }
-
-        RefreshHud();
-    }
-
-    /// <summary>
     /// 初始化当前总控依赖的几个核心协作模块。
     /// 包括：塔静态数据目录 `TowerCatalog`、HUD 表现层 `TowerDefenseHudPresenter`、
     /// 以及放置规则入口 `TowerPlacementRules`。这样后续逻辑就能围绕这些边界清晰的对象展开。
@@ -578,6 +465,19 @@ public class TowerDefenseGame : MonoBehaviour
 
         _hudPresenter = new TowerDefenseHudPresenter();
         _placementRules = new TowerPlacementRules(GetPlacementRadius, GetExpansionSquareSize);
+        _placementInteractionController = new TowerPlacementInteractionController(
+            isGameOverQuery: () => _isGameOver,
+            currentEnergyQuery: () => _currentEnergy,
+            canAffordTower: CanAffordTower,
+            getPrototype: GetPrototype,
+            getTowerDisplayName: GetTowerDisplayName,
+            screenToWorldPosition: ScreenToWorldPosition,
+            validatePlacementPosition: ValidatePlacementPosition,
+            getPlacementOverlayWorldBounds: GetPlacementOverlayWorldBounds,
+            tryPlaceTowerAt: (worldPosition, towerType) => TryPlaceTowerAt(worldPosition, towerType),
+            refreshHud: RefreshHud,
+            setStatusMessage: SetStatusMessage,
+            logPlacementDiagnostic: LogPlacementDiagnostic);
     }
 
     /// <summary>
@@ -605,6 +505,7 @@ public class TowerDefenseGame : MonoBehaviour
             GetPlacementRadius);
 
         _placementVisualController.BindPlacementPreviewRoot(_placementPreviewRoot);
+        _placementInteractionController?.BindPresentation(_placementVisualController, _hudPresenter, _towerCatalog);
     }
 
     /// <summary>
@@ -625,26 +526,23 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private TowerDefenseHudState CreateHudState()
     {
+        TowerType selectedTowerType = _placementInteractionController != null
+            ? _placementInteractionController.SelectedTowerType
+            : TowerType.None;
+        bool isPlacementDragActive = _placementInteractionController != null &&
+                                     _placementInteractionController.IsPlacementDragActive;
+        TowerType dragTowerType = _placementInteractionController != null
+            ? _placementInteractionController.DragTowerType
+            : TowerType.None;
+
         return new TowerDefenseHudState(
             currentEnergy: _currentEnergy,
             currentBaseHealth: _currentBaseHealth,
             currentWave: _currentWave,
             totalWaves: _totalWaves,
-            selectedTowerType: _selectedTowerType,
-            isPlacementDragActive: _isPlacementDragActive,
-            dragTowerType: _dragTowerType);
-    }
-
-    /// <summary>
-    /// 构造拖拽提示面板使用的快照数据。
-    /// 这样 HUD 不需要反向读取总控内部字段，只消费一份明确的只读状态。
-    /// </summary>
-    private TowerDragPreviewState CreateDragPreviewState()
-    {
-        return new TowerDragPreviewState(
-            towerType: _dragTowerType,
-            isValid: _previewPositionIsValid,
-            invalidReason: _previewInvalidReason);
+            selectedTowerType: selectedTowerType,
+            isPlacementDragActive: isPlacementDragActive,
+            dragTowerType: dragTowerType);
     }
 
     /// <summary>
@@ -669,7 +567,7 @@ public class TowerDefenseGame : MonoBehaviour
     private void ShowGameOver()
     {
         _isGameOver = true;
-        CancelPlacementDragInternal();
+        _placementInteractionController?.ForceCancelPlacementDrag();
         HideActiveEnemyHealthBars();
         Time.timeScale = 0f;
 
@@ -916,11 +814,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void PrewarmPlacementAreaOverlay(TowerType towerType)
     {
-        _placementVisualController?.PrewarmPlacementAreaOverlay(
-            towerType,
-            _isGameOver,
-            GetPlacementOverlayWorldBounds(towerType),
-            worldPosition => ValidatePlacementPosition(worldPosition, towerType, out _));
+        _placementInteractionController?.PrewarmPlacementAreaOverlay(towerType);
     }
 
     /// <summary>
@@ -930,27 +824,6 @@ public class TowerDefenseGame : MonoBehaviour
     private void InvalidatePlacementAreaOverlayCache()
     {
         _placementVisualController?.InvalidatePlacementAreaOverlayCache();
-    }
-
-    /// <summary>
-    /// 显示已经预热好的合法区域覆盖层。
-    /// 如果缓存仍然有效，就优先直接复用，减少拖拽起手时的卡顿。
-    /// </summary>
-    private void ShowPreparedPlacementAreaOverlay(TowerType towerType)
-    {
-        _placementVisualController?.ShowPreparedPlacementAreaOverlay(
-            towerType,
-            GetPlacementOverlayWorldBounds(towerType),
-            worldPosition => ValidatePlacementPosition(worldPosition, towerType, out _));
-    }
-
-    private void RefreshPlacementAreaOverlay(TowerType towerType)
-    {
-        _placementVisualController?.RefreshPlacementAreaOverlay(
-            towerType,
-            _isPlacementDragActive,
-            GetPlacementOverlayWorldBounds(towerType),
-            worldPosition => ValidatePlacementPosition(worldPosition, towerType, out _));
     }
 
     /// <summary>
@@ -1060,52 +933,6 @@ public class TowerDefenseGame : MonoBehaviour
         Vector3 worldPosition = _mainCamera.ScreenToWorldPoint(screenPoint);
         worldPosition.z = 0f;
         return worldPosition;
-    }
-
-    /// <summary>
-    /// 确保当前塔型对应的预览塔已经存在，并且出现在拖拽起始位置。
-    /// </summary>
-    private void EnsurePlacementPreviewInstance(TowerType towerType, Vector3 initialWorldPosition)
-    {
-        _placementVisualController?.EnsurePlacementPreviewInstance(towerType, initialWorldPosition);
-    }
-
-    private void DestroyPlacementPreview()
-    {
-        _placementVisualController?.DeactivatePlacementPreview();
-    }
-
-    /// <summary>
-    /// 释放当前的预览塔实例。
-    /// 这样下次开始拖拽时可以选择复用或重新创建，而不会把旧预览残留在场上。
-    /// </summary>
-    private void ReleasePlacementPreviewInstance()
-    {
-        _placementVisualController?.ReleasePlacementPreviewInstance();
-    }
-
-    /// <summary>
-    /// 根据当前是否合法，刷新预览塔的视觉状态。
-    /// </summary>
-    private void UpdatePlacementPreviewVisual()
-    {
-        _placementVisualController?.UpdatePlacementPreviewVisual(_previewPositionIsValid);
-    }
-
-    /// <summary>
-    /// 只清理拖拽阶段的临时状态。
-    /// 需要特别注意：这里不会顺手清掉当前已选塔型，
-    /// 所以它更像“结束一次拖拽”，而不是“清空整个部署选择”。
-    /// </summary>
-    private void CancelPlacementDragInternal()
-    {
-        _isPlacementDragActive = false;
-        _dragTowerType = TowerType.None;
-        _previewPositionIsValid = false;
-        _previewInvalidReason = string.Empty;
-        _hudPresenter.SetDragPreviewVisible(false);
-        HidePlacementAreaOverlay();
-        DestroyPlacementPreview();
     }
 
     /// <summary>
