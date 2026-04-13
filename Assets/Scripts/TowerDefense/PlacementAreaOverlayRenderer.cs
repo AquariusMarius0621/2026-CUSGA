@@ -21,6 +21,16 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
     private const float OverlayResolutionScale = 1.1f;
 
     /// <summary>
+    /// 后期部署网络变大后，覆盖层重建的主要风险不再是“边界够不够顺滑”，
+    /// 而是“像素总数会不会指数级把主线程压卡”。
+    ///
+    /// 所以这里给整张覆盖层一个总像素预算上限。
+    /// 当扫描范围继续变大时，我们优先主动降低分辨率，
+    /// 保证拖拽起手仍然顺，而不是死守同样密度导致后期每次放塔都轻微顿一下。
+    /// </summary>
+    private const int MaxOverlayPixelCount = 64000;
+
+    /// <summary>
     /// 只在“边界像素”上做轻量细采样。
     ///
     /// 这样既能让边界更顺滑，也不会像整图多重采样那样把性能打爆。
@@ -159,6 +169,8 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
         int width = Mathf.Max(1, Mathf.CeilToInt(worldBounds.size.x * effectivePixelsPerUnit));
         int height = Mathf.Max(1, Mathf.CeilToInt(worldBounds.size.y * effectivePixelsPerUnit));
 
+        CapOverlayResolution(ref width, ref height);
+
         EnsureWorkingBuffers(width, height);
         EnsureTextureResources(width, height, worldBounds.size.x);
 
@@ -203,6 +215,28 @@ public sealed class PlacementAreaOverlayRenderer : IDisposable
         _overlayTexture.SetPixels(_pixelBuffer);
         _overlayTexture.Apply(false, false);
         _spriteRenderer.sprite = _overlaySprite;
+    }
+
+    /// <summary>
+    /// 当部署网络越铺越大时，覆盖层像素总数也会随面积快速增长。
+    ///
+    /// 这里不去改玩法规则，只在可视化层主动做“按面积降采样”：
+    /// - 小范围仍然保持当前细腻度
+    /// - 大范围则按比例整体缩小宽高
+    ///
+    /// 这样可以把卡顿控制在更平缓的范围里，而不是到后几座塔时突然明显抖一下。
+    /// </summary>
+    private static void CapOverlayResolution(ref int width, ref int height)
+    {
+        long totalPixelCount = (long)width * height;
+        if (totalPixelCount <= MaxOverlayPixelCount)
+        {
+            return;
+        }
+
+        float scale = Mathf.Sqrt(MaxOverlayPixelCount / (float)totalPixelCount);
+        width = Mathf.Max(1, Mathf.FloorToInt(width * scale));
+        height = Mathf.Max(1, Mathf.FloorToInt(height * scale));
     }
 
     private void EnsureWorkingBuffers(int width, int height)

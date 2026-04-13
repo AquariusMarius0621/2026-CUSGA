@@ -4,14 +4,20 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// TowerDefenseHudState 鏄?HUD 姣忔鍒锋柊鏃剁湡姝ｉ渶瑕佺殑鏈€灏忕姸鎬佸揩鐓с€?///
-/// 杩欓噷鏁呮剰涓嶆妸鏁翠釜 `TowerDefenseGame` 鐩存帴鏆撮湶缁?HUD锛?/// 鑰屾槸鍙紶琛ㄧ幇灞傜湡姝ｅ叧蹇冪殑鍑犻」缁撴灉锛?/// - 褰撳墠璧勬簮
-/// - 褰撳墠鍩哄湴琛€閲?/// - 褰撳墠娉㈡
-/// - 褰撳墠閫変腑浜嗕粈涔堝缓绛?/// - 褰撳墠鏄惁姝ｅ湪鎷栨嫿閮ㄧ讲
+/// `TowerDefenseHudState` 是 HUD 每次刷新时真正需要的最小状态快照。
 ///
-/// 杩欐牱鍋氱殑鏍稿績濂藉鏄細
-/// HUD 鍙緷璧栤€滅粨鏋溾€濓紝涓嶄緷璧栨€绘帶鍐呴儴鐨勫叿浣撳疄鐜扮粏鑺傦紝
-/// 浠ュ悗鍗充娇鐜╂硶浠ｇ爜缁х画鎷嗗垎锛孒UD 涔熸洿瀹规槗淇濇寔绋冲畾銆?/// </summary>
+/// 这里刻意不把整个 `TowerDefenseGame` 直接暴露给 HUD，
+/// 而是只传表现层真正关心的结果：
+/// - 当前资源。
+/// - 当前基地血量。
+/// - 当前波次。
+/// - 当前选中了什么建筑。
+/// - 当前是否正在拖拽部署。
+///
+/// 这样做的核心好处是：
+/// HUD 只依赖“结果”，不依赖总控内部的实现细节。
+/// 以后即使玩法代码继续拆分，HUD 也更容易保持稳定。
+/// </summary>
 public readonly struct TowerDefenseHudState
 {
     public TowerDefenseHudState(
@@ -48,11 +54,16 @@ public readonly struct TowerDefenseHudState
 }
 
 /// <summary>
-/// TowerDragPreviewState 鏄嫋鎷芥彁绀洪潰鏉块渶瑕佺湅鍒扮殑灞€閮ㄧ姸鎬併€?///
-/// 瀹冨彧鍏虫敞涓変欢浜嬶細
-/// - 鐜板湪鎷栫殑鏄摢绉嶅缓绛?/// - 褰撳墠榧犳爣钀界偣鏄惁鍚堟硶
-/// - 濡傛灉涓嶅悎娉曪紝澶辫触鍘熷洜鏄粈涔?///
-/// 杩欎唤鐘舵€佷箣鎵€浠ュ崟鐙媶鍑烘潵锛?/// 鏄洜涓烘嫋鎷芥彁绀哄埛鏂伴鐜囧緢楂橈紝娌″繀瑕佹瘡娆￠兘鏁村寘甯︿笂瀹屾暣 HUD 鐘舵€併€?/// </summary>
+/// `TowerDragPreviewState` 是拖拽提示面板需要看到的局部状态。
+///
+/// 它只关心三件事：
+/// - 现在拖的是哪种建筑。
+/// - 当前鼠标落点是否合法。
+/// - 如果不合法，失败原因是什么。
+///
+/// 这份状态之所以单独拆出来，
+/// 是因为拖拽提示刷新频率很高，没必要每次都整包带上完整 HUD 状态。
+/// </summary>
 public readonly struct TowerDragPreviewState
 {
     public TowerDragPreviewState(TowerType towerType, bool isValid, string invalidReason)
@@ -69,10 +80,18 @@ public readonly struct TowerDragPreviewState
     public string InvalidReason { get; }
 }
 
-/// 涓嶄細涓€杩?Play 灏卞張琚剼鏈叏閮ㄦ憜鍥炲幓銆?/// </summary>
+/// <summary>
+/// `TowerDefenseHudPresenter` 负责把玩法层结果写进当前场景里的 HUD。
+///
+/// 这个类现在遵循“场景主导布局、脚本主导动态内容”的边界：
+/// - 场景决定卡片放哪、面板长什么样、字体排版怎么摆。
+/// - Presenter 负责把动态数字、动态说明和拖拽提示填进去。
+///
+/// 这样做以后，HUD 在 Scene / Inspector 里更容易直接调整，
+/// 也不会一进 Play 就又被脚本整套摆回去。
+/// </summary>
 public sealed class TowerDefenseHudPresenter
 {
-
     private TMP_Text _energyText;
     private TMP_Text _baseHealthText;
     private TMP_Text _waveText;
@@ -91,14 +110,17 @@ public sealed class TowerDefenseHudPresenter
     private GameObject _gameOverPanel;
     private GameObject _dragPreviewPanel;
 
-
     /// <summary>
-    /// 鐢卞閮ㄦ妸宸茬粡鍦?Inspector 涓嫋濂界殑 HUD 寮曠敤鐩存帴娉ㄥ叆杩涙潵銆?    ///
-    /// 杩欎竴姝ユ槸褰撳墠椤圭洰浠庘€滄寜鍚嶅瓧鏌ユ壘鍦烘櫙瀵硅薄鈥濋€愭杩佺Щ鍒扳€滄樉寮?Inspector 寮曠敤鈥濈殑绗竴姝ワ細
-    /// - 濡傛灉鍦烘櫙浣滆€呭凡缁忔妸寮曠敤鎷栧ソ锛孒UDPresenter 灏辩洿鎺ヤ娇鐢ㄨ繖浜涚‘瀹氱殑瀵硅薄
-    /// - 濡傛灉鏌愪簺寮曠敤鏆傛椂杩樻病鎷栵紝鍚庨潰 FindSceneReferences() 浠嶇劧浼氱户缁ˉ璧板悕瀛楁煡鎵惧厹搴?    ///
-    /// 杩欐牱鍋氱殑濂藉鏄縼绉诲彲浠ュ垎闃舵杩涜锛?    /// 鎴戜滑涓嶉渶瑕佷竴娆℃€ф妸鎵€鏈夊満鏅兘閲嶅仛瀹岋紝
-    /// 浣嗘柊琛ュソ鐨勫満鏅紩鐢ㄥ凡缁忚兘绔嬪埢鎽嗚劚鈥滄敼鍚嶅氨鐐糕€濈殑鑴嗗急妯″紡銆?    /// </summary>
+    /// 由外部把已经在 Inspector 里拖好的 HUD 引用直接注入进来。
+    ///
+    /// 这是项目从“按名字查找场景对象”逐步迁移到“显式 Inspector 引用”的关键步骤：
+    /// - 如果场景作者已经把引用拖好，Presenter 就直接使用这些确定对象。
+    /// - 如果某些引用暂时还没拖，后续仍然可以给出缺项告警。
+    ///
+    /// 这样做的好处是迁移可以分阶段进行，
+    /// 我们不需要一次性把所有场景重做完，
+    /// 但新补好的场景已经能立刻摆脱“改名就炸”的脆弱模式。
+    /// </summary>
     public void BindSceneReferences(
         TMP_Text energyText,
         TMP_Text baseHealthText,
@@ -134,14 +156,16 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鎸夊綋鍓嶉」鐩粛鍦ㄤ娇鐢ㄧ殑瀵硅薄鍚嶇害瀹氾紝鎶?HUD 鐩稿叧寮曠敤鎵鹃綈銆?    ///
-    /// 杩欎竴灞備粛鐒朵娇鐢ㄥ悕瀛楁煡鎵撅紝
-    /// 鏄洜涓洪」鐩暣浣撹繕娌″畬鍏ㄥ垏鍒?Inspector 鐩存嫋寮曠敤鐨勮閰嶆柟寮忋€?    /// 鎵€浠ワ細
-    /// - 鍦烘櫙閲岃繖浜涘璞″悕浠嶇劧瑕佷繚鎸佺ǔ瀹?    /// - 濡傛灉浣犳敼鍚嶏紝灏辫鍚屾鏀硅剼鏈粯璁ゅ€?    /// </summary>
+    /// 对当前 HUD 引用做一次补齐与告警检查。
+    ///
+    /// 现在它不再主动按名字回捞整套 HUD，
+    /// 这里只负责：
+    /// - 补按钮内部文字缓存。
+    /// - 纠正拖拽提示面板的射线设置。
+    /// - 对缺失引用输出明确告警。
+    /// </summary>
     public void FindSceneReferences()
     {
-        // 杩欎竴杞紑濮嬶紝HUD 涓婚摼涓嶅啀涓诲姩鎸夊悕瀛楀洖鎹炲満鏅璞°€?        // 瀵瑰綋鍓?SampleScene 鑰岃█锛屾牳蹇?HUD 鑺傜偣閮藉簲褰撳凡缁忛€氳繃澶栭儴鏄惧紡缁戝畾浼犺繘鏉ャ€?        // 鎵€浠ヨ繖閲岀幇鍦ㄥ彧鍋氫袱浠朵簨锛?        // 1. 琛ラ綈鎸夐挳鍐呴儴鐨勫瓙鏂囨湰缂撳瓨
-        // 2. 瀵圭己澶卞紩鐢ㄧ粰鍑烘槑纭憡璀︼紝甯姪鍦烘櫙瑁呴厤灏藉揩鏆撮湶闂
         if (_relayTowerButtonText == null && _relayTowerButton != null)
         {
             _relayTowerButtonText = _relayTowerButton.GetComponentInChildren<TMP_Text>(true);
@@ -173,18 +197,17 @@ public sealed class TowerDefenseHudPresenter
         WarnIfMissing(_dragPreviewLabel, "DragPreviewLabel");
     }
 
-
     /// <summary>
     /// 拖拽提示面板只是跟随鼠标的视觉说明，不应该拦截任何鼠标释放事件。
     ///
     /// 否则玩家把塔拖到地图上时，鼠标下方其实压着这个提示面板本身，
-    /// EventSystem 就会误以为“这次释放仍然发生在 UI 上”，
+    /// `EventSystem` 就会误以为“这次释放仍然发生在 UI 上”，
     /// 从而把一次本来合法的放塔当成取消操作。
     ///
     /// 这里同时把：
-    /// - 面板背景 Graphic 的 RaycastTarget 关掉
-    /// - 文本本身的 RaycastTarget 关掉
-    /// - 整个面板挂一个 CanvasGroup 并关闭 blocksRaycasts
+    /// - 面板背景 `Graphic` 的 `RaycastTarget` 关掉。
+    /// - 文本本身的 `RaycastTarget` 关掉。
+    /// - 整个面板挂一个 `CanvasGroup` 并关闭 `blocksRaycasts`。
     ///
     /// 这样就算场景里谁又手滑把某个 UI 组件的勾重新点上了，
     /// 运行时也会在 Presenter 绑定阶段把它纠正回“纯提示、不拦鼠标”的状态。
@@ -214,6 +237,7 @@ public sealed class TowerDefenseHudPresenter
             _dragPreviewLabel.raycastTarget = false;
         }
     }
+
     private static void WarnIfMissing(UnityEngine.Object reference, string expectedName)
     {
         if (reference == null)
@@ -223,11 +247,16 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鏍规嵁濉旂洰褰曠粺涓€閰嶇疆涓ゅ紶閮ㄧ讲鍗＄殑闈欐€佹枃妗堛€?    ///
-    /// 杩欓噷浠嶇劧淇濈暀灏戦噺鏍煎紡鎺у埗锛屽師鍥犳槸閮ㄧ讲鍗℃枃妗堟湰韬槸鐢辩帺娉曟暟鎹┍鍔ㄧ殑锛?    /// - 灞曠ず鍚嶄細鍙?    /// - 鎴愭湰浼氬彉
-    /// - 鎵╁紶鏂规牸璇存槑浼氬彉
+    /// 根据塔目录统一配置两张部署卡的静态文案。
     ///
-    /// 浣嗚繖閲屼笉浼氬啀鎺ョ鍗＄墖浣嶇疆銆佸簳鏉挎牱寮忓拰鏁翠釜鍙充晶鍖哄竷灞€锛?    /// 閭ｄ簺鍐呭鐜板湪搴旇涓昏鐢卞満鏅潵鎺у埗銆?    /// </summary>
+    /// 这里仍然保留少量格式控制，因为部署卡文案本身是由玩法数据驱动的：
+    /// - 展示名会变。
+    /// - 成本会变。
+    /// - 扩张方格说明会变。
+    ///
+    /// 但这里不会再接管卡片位置、底板样式和整个右侧区布局，
+    /// 那些内容现在应该主要由场景来控制。
+    /// </summary>
     public void ConfigureCardLabels(TowerCatalog towerCatalog)
     {
         ConfigureTowerCardLabel(_relayTowerButtonText, towerCatalog.GetDefinition(TowerType.Relay));
@@ -241,9 +270,12 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鍒锋柊甯搁┗ HUD銆?    ///
-    /// 杩欓噷鏇存柊鐨勬槸鈥滃€尖€濆拰鈥滅姸鎬佲€濓紝涓嶆槸鈥滅増寮忛鏋垛€濄€?    /// 鎵€浠ヤ綘鍦ㄥ満鏅噷璋冨ソ鐨勫竷灞€锛屼細琚繚鐣欎笅鏉ワ紱
-    /// 鑴氭湰鍙礋璐ｆ妸褰撳墠娓告垙鐘舵€佸～杩涘搴旀枃鏈噷銆?    /// </summary>
+    /// 刷新常驻 HUD。
+    ///
+    /// 这里更新的是“值”和“状态”，不是“版式骨架”。
+    /// 所以你在场景里调好的布局会被保留下来；
+    /// 脚本只负责把当前游戏状态填进对应文本里。
+    /// </summary>
     public void Refresh(TowerDefenseHudState state, TowerCatalog towerCatalog, Func<TowerType, bool> canAffordTower)
     {
         if (_energyText != null)
@@ -271,14 +303,19 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鏇存柊搴曢儴鐘舵€佹潯娑堟伅銆?    ///
-    /// 娉ㄦ剰杩欓噷涓嶆敼娑堟伅鍐呭鏈韩锛?    /// 鍥犱负鈥滀粈涔堟椂鍊欒浠€涔堚€濆睘浜庣帺娉曞眰鍐崇瓥锛?    /// HUD 鍙槸鎶婃€绘帶缁欏嚭鐨勭粨鏋滄樉绀哄嚭鏉ャ€?    /// </summary>
+    /// 接收玩法层发来的状态消息。
+    ///
+    /// 现在项目已经移除了常驻 `StatusStrip`，
+    /// 所以这里保留接口但不再显示固定状态栏。
+    /// 这样可以避免调用链断裂，同时把表现权交给别的提示 UI。
+    /// </summary>
     public void SetStatusMessage(string message)
     {
     }
 
     /// <summary>
-    /// 鎺у埗鎷栨嫿鎻愮ず闈㈡澘鏄鹃殣銆?    /// </summary>
+    /// 控制拖拽提示面板显隐。
+    /// </summary>
     public void SetDragPreviewVisible(bool visible)
     {
         if (_dragPreviewPanel != null)
@@ -288,13 +325,16 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鏇存柊璺熼殢榧犳爣鐨勬嫋鎷芥彁绀洪潰鏉裤€?    ///
-    /// 杩欓噷浠嶇劧淇濈暀鈥滆窡鐫€榧犳爣璧扳€濈殑琛屼负锛?    /// 鍥犱负瀹冩湰鏉ュ氨灞炰簬浜や簰鏈熷姩鎬佸弽棣堬紝
-    /// 鑰屼笉鏄簲璇ョ敱鍦烘櫙鍥哄畾鎽嗘鐨勭晫闈€?    ///
-    /// 鍚屾椂杩欓噷浼氭牴鎹綋鍓嶅鍨嬪拰鍚堟硶鎬х粨鏋滐紝
-    /// 瀹炴椂鍒锋柊鎻愮ず鏂囨锛屽府鍔╃帺瀹剁悊瑙ｏ細
-    /// - 褰撳墠鎷栫殑鏄彂鐢垫満杩樻槸鐐
-    /// - 杩欐钀界偣涓轰粈涔堣兘鏀?/ 涓嶈兘鏀?    /// </summary>
+    /// 更新跟随鼠标的拖拽提示面板。
+    ///
+    /// 这里仍然保留“跟着鼠标走”的行为，
+    /// 因为它本来就属于交互期动态反馈，而不是应该由场景固定摆死的界面。
+    ///
+    /// 同时这里会根据当前塔型和合法性结果，
+    /// 实时刷新提示文案，帮助玩家理解：
+    /// - 当前拖的是发电机还是炮塔。
+    /// - 这次落点为什么能放或不能放。
+    /// </summary>
     public void UpdateDragPreviewPanel(Vector2 screenPosition, TowerDragPreviewState previewState, TowerCatalog towerCatalog)
     {
         if (_dragPreviewPanel == null || _dragPreviewLabel == null)
@@ -335,7 +375,8 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鏄剧ず Game Over 闈㈡澘骞跺～鍏ユ枃妗堛€?    /// </summary>
+    /// 显示 `Game Over` 面板并填入文案。
+    /// </summary>
     public void ShowGameOver(string title, string hint)
     {
         if (_gameOverPanel != null)
@@ -355,7 +396,8 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鍗曠嫭鎺у埗 Game Over 闈㈡澘鏄鹃殣銆?    /// </summary>
+    /// 单独控制 `Game Over` 面板显隐。
+    /// </summary>
     public void SetGameOverVisible(bool visible)
     {
         if (_gameOverPanel != null)
@@ -365,8 +407,12 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 閰嶇疆鍗曞紶閮ㄧ讲鍗＄殑鏂囨銆?    ///
-    /// 杩欓噷淇濈暀灏戦噺鏂囨湰鎺掔増鎺у埗锛?    /// 鍙槸涓轰簡纭繚澶氳鍗＄墖鏂囨鍦ㄥ綋鍓嶅崱鐗囬噷鑳界ǔ瀹氳娓呮銆?    /// 浣嗗畠涓嶄細鍐嶅幓鏀规寜閽綅缃€佺埗鐗╀綋甯冨眬鎴栨暣涓彸渚у尯鍩熺粨鏋勩€?    /// </summary>
+    /// 配置单张部署卡的文案。
+    ///
+    /// 这里保留少量文本排版控制，
+    /// 只是为了确保多行卡片文案在当前卡片里能稳定读清楚。
+    /// 但它不会再去改按钮位置、父物体布局或整个右侧区结构。
+    /// </summary>
     private void ConfigureTowerCardLabel(TMP_Text label, TowerDefinition definition)
     {
         if (label == null || definition == null)
@@ -384,8 +430,11 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 缁勮鈥滃綋鍓嶉€変腑 / 褰撳墠鎷栨嫿鈥濈殑璇存槑鏂囨銆?    ///
-    /// 杩欓儴鍒嗕粛鐒剁敱鑴氭湰鐢熸垚锛?    /// 鍥犱负瀹冩湰璐ㄤ笂灏辨槸褰撳墠鐘舵€佺殑鍔ㄦ€佹憳瑕侊紝鑰屼笉鏄浐瀹氳楗版€ф枃鏈€?    /// </summary>
+    /// 组装“当前选中 / 当前拖拽”的说明文案。
+    ///
+    /// 这部分仍然由脚本生成，
+    /// 因为它本质上就是当前状态的动态摘要，而不是固定装饰性文本。
+    /// </summary>
     private string BuildSelectionText(TowerDefenseHudState state, TowerCatalog towerCatalog)
     {
         if (state.IsPlacementDragActive)
@@ -420,11 +469,15 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 鍦ㄢ€滃満鏅富瀵?HUD鈥濈殑妯″紡涓嬶紝鍙淮鎶ゆ寜閽殑鍙氦浜掔姸鎬併€?    ///
-    /// 涔熷氨鏄锛?    /// - 鍦烘櫙璐熻矗杩欎簺鎸夐挳闀夸粈涔堟牱
-    /// - 鑴氭湰鍙礋璐ｅ憡璇夊畠浠綋鍓嶈兘涓嶈兘鐐?    ///
-    /// 濡傛灉浣犳兂淇敼涓嶅彲璐拱鏃剁殑棰滆壊銆侀€変腑鏃剁殑楂樹寒銆佹寜涓嬫椂鐨勮繃娓★紝
-    /// 鐜板湪鏇存帹鑽愮洿鎺ュ幓 Button 鐨?Transition / ColorBlock 閲屾敼銆?    /// </summary>
+    /// 在“场景主导 HUD”的模式下，只维护按钮的可交互状态。
+    ///
+    /// 也就是说：
+    /// - 场景负责这些按钮长什么样。
+    /// - 脚本只负责告诉它们当前能不能点。
+    ///
+    /// 如果你想修改不可购买时的颜色、选中时的高亮、按下时的过渡，
+    /// 现在更推荐直接去 Button 的 `Transition / ColorBlock` 里改。
+    /// </summary>
     private void UpdateButtonInteractableState(Func<TowerType, bool> canAffordTower)
     {
         if (_relayTowerButton != null)
@@ -444,8 +497,12 @@ public sealed class TowerDefenseHudPresenter
     }
 
     /// <summary>
-    /// 缁勮椤堕儴璧勬簮鍗＄殑瀵屾枃鏈€?    ///
-    /// 杩欓噷杩斿洖鐨勬槸鈥滃唴瀹规牸寮忊€濓紝涓嶆槸甯冨眬鏍煎紡锛?    /// 鍗＄墖鏀惧摢銆佸瓧鍧楀澶с€佸杈硅窛澶氬皯锛屽簲璇ヤ富瑕佺敱鍦烘櫙鎺у埗锛?    /// 浣嗘瘡寮犲崱鏂囧瓧閲屾爣绛惧拰鏁板€肩殑灞傜骇鍏崇郴锛屼粛鐒堕€傚悎鐢变唬鐮佺粺涓€鐢熸垚銆?    /// </summary>
+    /// 组装顶部资源卡的富文本。
+    ///
+    /// 这里返回的是“内容格式”，不是布局格式。
+    /// 卡片放哪、字号多大、外边距多少，应该主要由场景控制；
+    /// 但每张卡内部标签和数值的层级关系，仍然适合由代码统一生成。
+    /// </summary>
     private static string BuildMetricText(string label, string value, string accentHex)
     {
         return

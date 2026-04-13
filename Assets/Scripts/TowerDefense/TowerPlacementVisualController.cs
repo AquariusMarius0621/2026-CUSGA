@@ -137,6 +137,28 @@ public sealed class TowerPlacementVisualController : IDisposable
     }
 
     /// <summary>
+    /// 提前把某个塔型的预览对象准备好，并立刻隐藏起来。
+    ///
+    /// 这样真正开始拖拽时，大多数情况下就不需要第一次再 `Instantiate`，
+    /// 只需要把已经准备好的预览塔挪到鼠标下方重新激活即可。
+    ///
+    /// 这里故意把预热位置放到远离战场的地方，再立即隐藏，
+    /// 是为了保证：
+    /// - 不会在地图中央闪一下
+    /// - 也不会误参与任何可见反馈
+    /// </summary>
+    public void PrewarmPlacementPreviewInstance(TowerType towerType)
+    {
+        if (towerType == TowerType.None || _placementPreviewRoot == null || _getPrototype == null || _getPrototype(towerType) == null)
+        {
+            return;
+        }
+
+        EnsurePlacementPreviewInstance(towerType, new Vector3(10000f, 10000f, 0f));
+        DeactivatePlacementPreview();
+    }
+
+    /// <summary>
     /// 拖拽刚开始时优先显示预热结果。
     ///
     /// 如果当前没有可复用缓存，就退回实时刷新，保证正确性优先。

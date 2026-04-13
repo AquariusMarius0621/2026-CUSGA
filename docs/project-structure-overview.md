@@ -190,3 +190,13 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - “能不能放”优先看 `TowerPlacementRules.cs`
   - “拖拽时看见什么”优先看 `TowerPlacementVisualController.cs`
   - `TowerDefenseGame.cs` 继续负责总协调、资源扣减、真正建塔和 HUD 刷新入口
+
+## 14. 2026-04-12 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerPlacementInteractionController.cs`
+  这是第三轮组件化新增的放置交互流程控制器。它专门负责“玩家当前怎么进入放置流程、怎么更新拖拽、怎么结束放置、怎么取消部署、怎么做点击快速放置”。
+- 当前放置系统的推荐阅读顺序更新为：
+  - “能不能放”优先看 `TowerPlacementRules.cs`
+  - “拖拽时看见什么”优先看 `TowerPlacementVisualController.cs`
+  - “玩家怎么完成整条放置交互流程”优先看 `TowerPlacementInteractionController.cs`
+  - `TowerDefenseGame.cs` 继续做整局总协调、资源扣减、真正实例化塔和 HUD 总刷新入口
