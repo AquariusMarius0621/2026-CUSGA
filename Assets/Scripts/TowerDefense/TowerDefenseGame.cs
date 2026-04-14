@@ -135,6 +135,13 @@ public class TowerDefenseGame : MonoBehaviour
     private TowerPlacementBuildExecutor _placementBuildExecutor;
 
     /// <summary>
+    /// `_presentationCoordinator` 负责 HUD 广播与结算表现收尾。
+    /// 它把 HUD 快照组装、状态消息转发、Game Over 面板显示和敌人血条隐藏这些表现层协调逻辑
+    /// 从总控中继续收口出去。
+    /// </summary>
+    private TowerDefensePresentationCoordinator _presentationCoordinator;
+
+    /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
     /// 总控通过它读配置，而不是把这些常量散落在很多 `switch` 里。
     /// </summary>
@@ -198,15 +205,8 @@ public class TowerDefenseGame : MonoBehaviour
         EnsureRuntimeRoots();
         RefreshPlacementRuleContext();
         InitializePlacementVisuals();
-        _hudPresenter.ConfigureCardLabels(_towerCatalog);
-
-        SetStatusMessage("Place your first structure in the starter zone. Drag a Generator or Turret into a highlighted legal area. Hotkeys: 1 / 2.");
-        RefreshHud();
-
-        _hudPresenter.SetGameOverVisible(false);
-        _hudPresenter.SetDragPreviewVisible(false);
+        _presentationCoordinator?.InitializePresentation("Place your first structure in the starter zone. Drag a Generator or Turret into a highlighted legal area. Hotkeys: 1 / 2.");
         HidePlacementAreaOverlay();
-        RefreshStarterZoneMarker();
         RunStarterPlacementSanityCheck();
     }
 
@@ -325,7 +325,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void SetStatusMessage(string message)
     {
-        _hudPresenter?.SetStatusMessage(message);
+        _presentationCoordinator?.SetStatusMessage(message);
     }
 
     /// <summary>
@@ -495,6 +495,12 @@ public class TowerDefenseGame : MonoBehaviour
             refreshHud: RefreshHud,
             setStatusMessage: SetStatusMessage,
             logPlacementDiagnostic: LogPlacementDiagnostic);
+        _presentationCoordinator = new TowerDefensePresentationCoordinator(
+            sessionStateQuery: () => _sessionState,
+            interactionControllerQuery: () => _placementInteractionController,
+            canAffordTower: CanAffordTower,
+            refreshStarterZoneMarker: RefreshStarterZoneMarker);
+        _presentationCoordinator.BindPresentation(_hudPresenter, _towerCatalog);
     }
 
     /// <summary>
@@ -538,52 +544,22 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
     /// <summary>
-    /// 构造玩法 HUD 使用的整局状态快照。
-    /// 它把资源、基地、波次、选中塔型和拖拽状态统一收口，便于 Presenter 一次性刷新。
-    /// </summary>
-    private TowerDefenseHudState CreateHudState()
-    {
-        TowerType selectedTowerType = _placementInteractionController != null
-            ? _placementInteractionController.SelectedTowerType
-            : TowerType.None;
-        bool isPlacementDragActive = _placementInteractionController != null &&
-                                     _placementInteractionController.IsPlacementDragActive;
-        TowerType dragTowerType = _placementInteractionController != null
-            ? _placementInteractionController.DragTowerType
-            : TowerType.None;
-        int currentEnergy = _sessionState != null ? _sessionState.CurrentEnergy : 0;
-        int currentBaseHealth = _sessionState != null ? _sessionState.CurrentBaseHealth : 0;
-        int currentWave = _sessionState != null ? _sessionState.CurrentWave : 0;
-        int totalWaves = _sessionState != null ? _sessionState.TotalWaves : 0;
-
-        return new TowerDefenseHudState(
-            currentEnergy: currentEnergy,
-            currentBaseHealth: currentBaseHealth,
-            currentWave: currentWave,
-            totalWaves: totalWaves,
-            selectedTowerType: selectedTowerType,
-            isPlacementDragActive: isPlacementDragActive,
-            dragTowerType: dragTowerType);
-    }
-
-    /// <summary>
     /// 刷新 HUD。
-    /// 这里会先更新首塔起手区标记，再把当前整局状态打包后交给 HUD 表现层统一刷新。
+    /// 当前这一步已经继续下沉到 `_presentationCoordinator`，
+    /// 所以总控这里保留的是一个稳定门面，方便其他模块仍然通过统一入口触发表现刷新。
     /// </summary>
     private void RefreshHud()
     {
-        RefreshStarterZoneMarker();
-        if (_hudPresenter == null || _towerCatalog == null)
-        {
-            return;
-        }
-
-        _hudPresenter.Refresh(CreateHudState(), _towerCatalog, CanAffordTower);
+        _presentationCoordinator?.RefreshHud();
     }
 
     /// <summary>
     /// 触发 Game Over。
-    /// 这里会锁定结算状态、取消当前部署、隐藏敌人血条、暂停时间，并把结算面板切到可见。
+    /// 这里保留玩法层面的结算切态：
+    /// - 标记会话进入 Game Over
+    /// - 强制取消当前部署交互
+    /// - 暂停时间
+    /// 而 HUD 广播、面板显示和血条隐藏，则继续交给 `_presentationCoordinator`。
     /// </summary>
     private void ShowGameOver()
     {
@@ -593,32 +569,8 @@ public class TowerDefenseGame : MonoBehaviour
         }
 
         _placementInteractionController?.ForceCancelPlacementDrag();
-        HideActiveEnemyHealthBars();
         Time.timeScale = 0f;
-
-        _hudPresenter?.ShowGameOver(
-            title: "GAME OVER",
-            hint: "The base has fallen. Exit Play Mode to keep adjusting the level and deployment flow.");
-
-        SetStatusMessage("Base integrity depleted. Operation failed.");
-        RefreshHud();
-    }
-
-    /// <summary>
-    /// 在结算时隐藏所有仍然存活敌人的血条。
-    /// 这样可以避免 Game Over 画面出现后，场上的血条还悬浮在界面前面干扰阅读。
-    /// </summary>
-    private void HideActiveEnemyHealthBars()
-    {
-        int activeEnemyCount = Enemy.ActiveEnemyCount;
-        for (int i = 0; i < activeEnemyCount; i++)
-        {
-            Enemy enemy = Enemy.GetActiveEnemy(i);
-            if (enemy != null)
-            {
-                enemy.SetHealthBarVisible(false);
-            }
-        }
+        _presentationCoordinator?.ShowGameOver();
     }
 
 

@@ -254,3 +254,17 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - `TowerPlacementInteractionController.cs`：玩家现在处于什么放置交互阶段
   - `TowerPlacementBuildExecutor.cs`：确认建塔后，怎么真正把塔落进场景
   - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链
+
+## 18. 2026-04-14 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerDefensePresentationCoordinator.cs`
+  这是当前新增的“表现协调器”。它专门负责：
+  - 把会话状态和放置交互状态组装成 `TowerDefenseHudState`
+  - 把状态消息往 HUD presenter 广播
+  - 在 Game Over 时隐藏敌人血条、显示结算面板并刷新 HUD
+- 这意味着现在推荐的理解进一步变成：
+  - `TowerDefenseSessionState.cs`：这局现在是什么状态
+  - `TowerPlacementInteractionController.cs`：玩家现在处于什么放置交互阶段
+  - `TowerPlacementBuildExecutor.cs`：确认建塔后，怎么真正把塔落进场景
+  - `TowerDefensePresentationCoordinator.cs`：这些状态怎样广播到 HUD 和结算表现
+  - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链
