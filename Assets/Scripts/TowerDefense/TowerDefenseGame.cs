@@ -128,6 +128,13 @@ public class TowerDefenseGame : MonoBehaviour
     private TowerPlacementInteractionController _placementInteractionController;
 
     /// <summary>
+    /// `_placementBuildExecutor` 负责真正建塔这一段执行链。
+    /// 也就是：最终校验、实例化塔、兼容旧 BuildPad、补碰撞体、扣费和放置成功后的收尾刷新。
+    /// 这样总控就不用再同时承担“整局状态管理”和“建塔流水线细节”两种职责。
+    /// </summary>
+    private TowerPlacementBuildExecutor _placementBuildExecutor;
+
+    /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
     /// 总控通过它读配置，而不是把这些常量散落在很多 `switch` 里。
     /// </summary>
@@ -478,6 +485,20 @@ public class TowerDefenseGame : MonoBehaviour
             refreshHud: RefreshHud,
             setStatusMessage: SetStatusMessage,
             logPlacementDiagnostic: LogPlacementDiagnostic);
+        _placementBuildExecutor = new TowerPlacementBuildExecutor(
+            isGameOverQuery: () => _isGameOver,
+            currentEnergyQuery: () => _currentEnergy,
+            setCurrentEnergy: value => _currentEnergy = value,
+            getTowerCost: GetTowerCost,
+            getTowerDisplayName: GetTowerDisplayName,
+            getPrototype: GetPrototype,
+            getPlacedTowerRoot: () => _placedTowerRoot,
+            getPlacementRadius: GetPlacementRadius,
+            validatePlacementPosition: ValidatePlacementPosition,
+            invalidatePlacementAreaOverlayCache: InvalidatePlacementAreaOverlayCache,
+            refreshHud: RefreshHud,
+            setStatusMessage: SetStatusMessage,
+            logPlacementDiagnostic: LogPlacementDiagnostic);
     }
 
     /// <summary>
@@ -597,70 +618,15 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
 
+    /// <summary>
+    /// 对总控内部与外部兼容层保留一个统一的“真正建塔”入口。
+    /// 现在具体执行细节已经下沉到 `_placementBuildExecutor`，
+    /// 所以这个方法更像一个稳定门面，避免别的脚本将来直接耦合到执行器实现。
+    /// </summary>
     private bool TryPlaceTowerAt(Vector3 worldPosition, TowerType towerType, BuildPad ownerPad = null)
     {
-        if (_isGameOver || towerType == TowerType.None)
-        {
-            return false;
-        }
-
-        if (ownerPad != null && ownerPad.IsOccupied)
-        {
-            SetStatusMessage("This legacy build pad is already occupied.");
-            LogPlacementDiagnostic($"TryPlace rejected: legacy BuildPad already occupied. tower={towerType} world={worldPosition}");
-            return false;
-        }
-
-        int cost = GetTowerCost(towerType);
-        if (_currentEnergy < cost)
-        {
-            SetStatusMessage($"Not enough energy. You currently have {_currentEnergy} EN.");
-            LogPlacementDiagnostic($"TryPlace rejected: insufficient energy. tower={towerType} cost={cost} currentEnergy={_currentEnergy}");
-            return false;
-        }
-
-        GameObject prototype = GetPrototype(towerType);
-        if (prototype == null)
-        {
-            SetStatusMessage("Tower prototype is missing. Check the scene setup.");
-            LogPlacementDiagnostic($"TryPlace rejected: missing prototype. tower={towerType}");
-            return false;
-        }
-
-        if (!ValidatePlacementPosition(worldPosition, towerType, out string invalidReason))
-        {
-            SetStatusMessage(invalidReason);
-            LogPlacementDiagnostic($"TryPlace rejected by validation: tower={towerType} world={worldPosition} reason={invalidReason}");
-            return false;
-        }
-
-        GameObject tower = Instantiate(prototype, worldPosition, Quaternion.identity, _placedTowerRoot);
-        tower.name = ownerPad != null
-            ? $"{GetTowerDisplayName(towerType)}_{ownerPad.name}"
-            : $"{GetTowerDisplayName(towerType)}_{_placedTowerRoot.childCount:00}";
-        tower.SetActive(true);
-
-        EnsureTowerPlacementCollider(tower, towerType);
-
-        if (ownerPad != null)
-        {
-            ownerPad.SetOccupant(tower);
-
-            PlacedTower placedTower = tower.GetComponent<PlacedTower>();
-            if (placedTower == null)
-            {
-                placedTower = tower.AddComponent<PlacedTower>();
-            }
-
-            placedTower.Initialize(ownerPad, towerType);
-        }
-
-        _currentEnergy -= cost;
-        InvalidatePlacementAreaOverlayCache();
-        SetStatusMessage($"Deployed {GetTowerDisplayName(towerType)} for {cost} EN.");
-        LogPlacementDiagnostic($"TryPlace succeeded: tower={towerType} world={worldPosition} cost={cost} remainingEnergy={_currentEnergy}");
-        RefreshHud();
-        return true;
+        return _placementBuildExecutor != null &&
+               _placementBuildExecutor.TryPlaceTowerAt(worldPosition, towerType, ownerPad);
     }
 
     /// <summary>
@@ -751,27 +717,6 @@ public class TowerDefenseGame : MonoBehaviour
     private bool ShouldIgnorePlacementTransform(Transform candidate)
     {
         return _placementVisualController != null && _placementVisualController.ContainsPreviewTransform(candidate);
-    }
-
-    /// <summary>
-    /// 确保正式放下的塔拥有用于后续放置校验的触发圆形碰撞体。
-    /// 这个碰撞体不参与真实物理阻挡，只服务于“塔之间不能过近”的规则。
-    /// </summary>
-    private void EnsureTowerPlacementCollider(GameObject tower, TowerType towerType)
-    {
-        if (tower == null)
-        {
-            return;
-        }
-
-        CircleCollider2D circleCollider = tower.GetComponent<CircleCollider2D>();
-        if (circleCollider == null)
-        {
-            circleCollider = tower.AddComponent<CircleCollider2D>();
-        }
-
-        circleCollider.isTrigger = true;
-        circleCollider.radius = GetPlacementRadius(towerType);
     }
 
     /// <summary>

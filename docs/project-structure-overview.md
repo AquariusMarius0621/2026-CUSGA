@@ -219,3 +219,18 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - 整局总协调入口
   - 真正建塔与扣费的执行层
   - 规则、可视化、HUD 三条链路之间的装配层
+
+## 16. 2026-04-13 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerPlacementBuildExecutor.cs`
+  这是这一轮新拆出的“建塔执行链”组件。它专门负责：
+  - 最终落塔前的执行侧校验
+  - 实例化正式塔对象
+  - 旧 `BuildPad` 的兼容桥接
+  - 扣费、成功提示和放置成功后的 HUD/覆盖层收尾
+- 当前放置系统的推荐阅读顺序进一步更新为：
+  - “能不能放”优先看 `TowerPlacementRules.cs`
+  - “拖拽时看见什么”优先看 `TowerPlacementVisualController.cs`
+  - “玩家怎么完成整条放置交互流程”优先看 `TowerPlacementInteractionController.cs`
+  - “一旦确认要建，塔究竟怎么真正落地”优先看 `TowerPlacementBuildExecutor.cs`
+  - `TowerDefenseGame.cs` 继续做整局总协调和这些组件之间的装配层
