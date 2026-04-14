@@ -1,5 +1,5 @@
 ﻿# Tower Defense Project Structure Overview
-Updated: 2026-04-13
+Updated: 2026-04-14
 Audience: 缁欓」鐩淮鎶よ€呯湅鐨勭粨鏋勮鏄庢枃妗ｃ€?Goal: 鐢ㄦ洿濂借鐨勬柟寮忚娓呮褰撳墠椤圭洰鐢卞摢浜涘満鏅€佽剼鏈€乁I銆佹枃妗ｅ拰宸ュ叿缁勬垚锛屼互鍙婂畠浠€庝箞鍗忎綔銆?
 ## 1. 涓€鍙ヨ瘽鐞嗚В杩欎釜椤圭洰
 杩欐槸涓€涓?Unity 2022.3 鐨?2D 濉旈槻鍘熷瀷椤圭洰銆?褰撳墠鏍稿績鐗硅壊鏄細
@@ -234,3 +234,23 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - “玩家怎么完成整条放置交互流程”优先看 `TowerPlacementInteractionController.cs`
   - “一旦确认要建，塔究竟怎么真正落地”优先看 `TowerPlacementBuildExecutor.cs`
   - `TowerDefenseGame.cs` 继续做整局总协调和这些组件之间的装配层
+
+## 17. 2026-04-14 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerDefenseSessionState.cs`
+  这是当前新增的“局内运行状态”组件。它专门保存：
+  - 当前电量
+  - 基地剩余生命
+  - 当前波次 / 总波次
+  - 是否已经 Game Over
+- 这意味着现在如果你要改：
+  - 资源加减
+  - 基地扣血后的状态变化
+  - 波次数字怎么保存
+  - 结算标记怎么进入
+  优先应该先看 `TowerDefenseSessionState.cs`，而不是先回 `TowerDefenseGame.cs` 找零散字段。
+- 当前推荐理解可以记成：
+  - `TowerDefenseSessionState.cs`：这局现在是什么状态
+  - `TowerPlacementInteractionController.cs`：玩家现在处于什么放置交互阶段
+  - `TowerPlacementBuildExecutor.cs`：确认建塔后，怎么真正把塔落进场景
+  - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链

@@ -18,9 +18,9 @@ public enum TowerType
 
 /// <summary>
 /// `TowerDefenseGame` 是当前塔防原型的整局总协调器。
-/// 它负责资源、基地血量、波次状态、放置输入总调度、真正建塔，以及 HUD 刷新入口。
-/// 需要注意的是：放置规则与放置可视化已经分别拆到独立组件里，
-/// 所以这个类更像“编排层”而不是继续把所有细节都塞进一个上帝脚本。
+/// 它负责把“运行状态、放置规则、放置交互、建塔执行、HUD 表现”这些子模块装配成一条完整主链。
+/// 需要注意的是：资源/基地/波次状态、放置交互和真正建塔执行都已经继续下沉到独立组件里，
+/// 所以这个类越来越像一个编排层，而不是继续把所有细节都塞进一个上帝脚本。
 /// </summary>
 public class TowerDefenseGame : MonoBehaviour
 {
@@ -100,11 +100,11 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private GameObject dragPreviewPanelReference;
     [SerializeField] private TMP_Text dragPreviewLabelReference;
 
-    private int _currentEnergy;
-    private int _currentBaseHealth;
-    private int _currentWave;
-    private int _totalWaves;
-    private bool _isGameOver;
+    /// <summary>
+    /// `_sessionState` 负责保存这一局的资源、基地、波次和结算状态。
+    /// 它是当前总控最核心的一份“局内运行状态源”。
+    /// </summary>
+    private TowerDefenseSessionState _sessionState;
 
     private GameObject _relayTowerPrototype;
     private GameObject _defenseTowerPrototype;
@@ -150,7 +150,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// <summary>
     /// 对外暴露只读的结算状态，方便 HUD、敌人和其他运行时对象判断当前是否已经 Game Over。
     /// </summary>
-    public bool IsGameOver => _isGameOver;
+    public bool IsGameOver => _sessionState != null && _sessionState.IsGameOver;
 
     /// <summary>
     /// `Awake()` 负责建立单例、锁定基础运行参数，并把场景引用与协作模块先装配起来。
@@ -168,8 +168,7 @@ public class TowerDefenseGame : MonoBehaviour
         Time.timeScale = 1f;
         Application.runInBackground = true;
 
-        _currentEnergy = startingEnergy;
-        _currentBaseHealth = startingBaseHealth;
+        _sessionState = new TowerDefenseSessionState(startingEnergy, startingBaseHealth);
         InitializeArchitectureModules();
     }
 
@@ -282,12 +281,11 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void AddEnergy(int amount)
     {
-        if (_isGameOver || amount <= 0)
+        if (_sessionState == null || !_sessionState.TryAddEnergy(amount))
         {
             return;
         }
 
-        _currentEnergy += amount;
         RefreshHud();
     }
 
@@ -297,16 +295,15 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void DamageBase(int amount)
     {
-        if (_isGameOver || amount <= 0)
+        if (_sessionState == null || !_sessionState.TryApplyBaseDamage(amount, out int actualDamage, out bool baseDepleted))
         {
             return;
         }
 
-        _currentBaseHealth = Mathf.Max(0, _currentBaseHealth - amount);
         RefreshHud();
-        SetStatusMessage($"An enemy slipped through. Base lost {amount} HP.");
+        SetStatusMessage($"An enemy slipped through. Base lost {actualDamage} HP.");
 
-        if (_currentBaseHealth == 0)
+        if (baseDepleted)
         {
             ShowGameOver();
         }
@@ -317,8 +314,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void SetWaveProgress(int currentWave, int totalWaves)
     {
-        _currentWave = currentWave;
-        _totalWaves = totalWaves;
+        _sessionState?.SetWaveProgress(currentWave, totalWaves);
         RefreshHud();
     }
 
@@ -368,7 +364,7 @@ public class TowerDefenseGame : MonoBehaviour
             return false;
         }
 
-        return _currentEnergy >= GetTowerCost(towerType);
+        return _sessionState != null && _sessionState.CanAfford(GetTowerCost(towerType));
     }
 
     /// <summary>
@@ -398,7 +394,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void HandleQuickPlacementInput()
     {
-        if (_isGameOver || _placementInteractionController == null)
+        if (IsGameOver || _placementInteractionController == null)
         {
             return;
         }
@@ -432,7 +428,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void RunStarterPlacementSanityCheck()
     {
-        if (_isGameOver)
+        if (IsGameOver)
         {
             return;
         }
@@ -473,8 +469,8 @@ public class TowerDefenseGame : MonoBehaviour
         _hudPresenter = new TowerDefenseHudPresenter();
         _placementRules = new TowerPlacementRules(GetPlacementRadius, GetExpansionSquareSize);
         _placementInteractionController = new TowerPlacementInteractionController(
-            isGameOverQuery: () => _isGameOver,
-            currentEnergyQuery: () => _currentEnergy,
+            isGameOverQuery: () => _sessionState != null && _sessionState.IsGameOver,
+            currentEnergyQuery: () => _sessionState != null ? _sessionState.CurrentEnergy : 0,
             canAffordTower: CanAffordTower,
             getPrototype: GetPrototype,
             getTowerDisplayName: GetTowerDisplayName,
@@ -486,9 +482,9 @@ public class TowerDefenseGame : MonoBehaviour
             setStatusMessage: SetStatusMessage,
             logPlacementDiagnostic: LogPlacementDiagnostic);
         _placementBuildExecutor = new TowerPlacementBuildExecutor(
-            isGameOverQuery: () => _isGameOver,
-            currentEnergyQuery: () => _currentEnergy,
-            setCurrentEnergy: value => _currentEnergy = value,
+            isGameOverQuery: () => _sessionState != null && _sessionState.IsGameOver,
+            currentEnergyQuery: () => _sessionState != null ? _sessionState.CurrentEnergy : 0,
+            setCurrentEnergy: value => _sessionState?.SetCurrentEnergy(value),
             getTowerCost: GetTowerCost,
             getTowerDisplayName: GetTowerDisplayName,
             getPrototype: GetPrototype,
@@ -555,12 +551,16 @@ public class TowerDefenseGame : MonoBehaviour
         TowerType dragTowerType = _placementInteractionController != null
             ? _placementInteractionController.DragTowerType
             : TowerType.None;
+        int currentEnergy = _sessionState != null ? _sessionState.CurrentEnergy : 0;
+        int currentBaseHealth = _sessionState != null ? _sessionState.CurrentBaseHealth : 0;
+        int currentWave = _sessionState != null ? _sessionState.CurrentWave : 0;
+        int totalWaves = _sessionState != null ? _sessionState.TotalWaves : 0;
 
         return new TowerDefenseHudState(
-            currentEnergy: _currentEnergy,
-            currentBaseHealth: _currentBaseHealth,
-            currentWave: _currentWave,
-            totalWaves: _totalWaves,
+            currentEnergy: currentEnergy,
+            currentBaseHealth: currentBaseHealth,
+            currentWave: currentWave,
+            totalWaves: totalWaves,
             selectedTowerType: selectedTowerType,
             isPlacementDragActive: isPlacementDragActive,
             dragTowerType: dragTowerType);
@@ -587,7 +587,11 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void ShowGameOver()
     {
-        _isGameOver = true;
+        if (_sessionState != null)
+        {
+            _sessionState.MarkGameOver();
+        }
+
         _placementInteractionController?.ForceCancelPlacementDrag();
         HideActiveEnemyHealthBars();
         Time.timeScale = 0f;
@@ -788,7 +792,7 @@ public class TowerDefenseGame : MonoBehaviour
         Bounds starterBounds = _placementRules != null
             ? _placementRules.GetStarterZoneBounds()
             : TowerPlacementRules.CreateSquareBounds(initialPlacementSquareCenter, initialPlacementSquareSize);
-        _placementVisualController?.RefreshStarterZoneMarker(!_isGameOver && ShouldShowStarterZoneMarker(), starterBounds);
+        _placementVisualController?.RefreshStarterZoneMarker(!IsGameOver && ShouldShowStarterZoneMarker(), starterBounds);
     }
 
     /// <summary>
