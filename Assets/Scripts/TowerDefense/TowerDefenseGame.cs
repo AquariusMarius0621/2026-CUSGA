@@ -148,6 +148,12 @@ public class TowerDefenseGame : MonoBehaviour
     private TowerDefenseSceneBootstrapper _sceneBootstrapper;
 
     /// <summary>
+    /// `_inputCoordinator` 负责输入轮询、快速点击放置、屏幕坐标换算和 UI 阻挡判断。
+    /// 这样总控就不再自己持有这一组输入工具层细节。
+    /// </summary>
+    private TowerDefenseInputCoordinator _inputCoordinator;
+
+    /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
     /// 总控通过它读配置，而不是把这些常量散落在很多 `switch` 里。
     /// </summary>
@@ -217,13 +223,13 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
     /// <summary>
-    /// `Update()` 只负责处理输入入口。
-    /// 这里刻意保持轻量，把热键和快速点击放置拆开处理，避免在每帧主循环里塞入过多业务细节。
+    /// `Update()` 现在只负责驱动输入协调器。
+    /// 这样总控不再自己轮询热键、快速点击放置和 UI 阻挡判断，
+    /// 而是把这些输入层细节统一交给 `_inputCoordinator`。
     /// </summary>
     private void Update()
     {
-        HandleHotkeys();
-        HandleQuickPlacementInput();
+        _inputCoordinator?.Tick();
     }
 
     /// <summary>
@@ -373,46 +379,6 @@ public class TowerDefenseGame : MonoBehaviour
         return _sessionState != null && _sessionState.CanAfford(GetTowerCost(towerType));
     }
 
-    /// <summary>
-    /// 处理本场景约定的快捷键。
-    /// `1 / 2` 用来快速切换发电机和防御塔，`Esc / 右键` 用来取消当前部署状态。
-    /// </summary>
-    private void HandleHotkeys()
-    {
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            SelectRelayTower();
-        }
-        else if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            SelectDefenseTower();
-        }
-
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
-        {
-            ClearSelection();
-        }
-    }
-
-    /// <summary>
-    /// 处理“已选中塔型但没有拖拽时”的快速点击放置入口。
-    /// 规则是：必须已经选塔、不能处于拖拽中、不能点在会拦截玩法的 UI 上，然后才尝试按鼠标世界坐标直接落塔。
-    /// </summary>
-    private void HandleQuickPlacementInput()
-    {
-        if (IsGameOver || _placementInteractionController == null)
-        {
-            return;
-        }
-
-        if (!Input.GetMouseButtonDown(0) || IsPointerOverUserInterface())
-        {
-            return;
-        }
-
-        _placementInteractionController.TryQuickPlacementAt(GetMouseWorldPosition());
-    }
-
 
     /// <summary>
     /// 统一输出放置诊断日志。
@@ -449,8 +415,8 @@ public class TowerDefenseGame : MonoBehaviour
 
     /// <summary>
     /// 初始化当前总控依赖的几个核心协作模块。
-    /// 包括：塔静态数据目录 `TowerCatalog`、HUD 表现层 `TowerDefenseHudPresenter`、
-    /// 以及放置规则入口 `TowerPlacementRules`。这样后续逻辑就能围绕这些边界清晰的对象展开。
+    /// 包括：塔静态数据目录、输入协调器、HUD 表现层、放置规则入口、放置交互、建塔执行、表现协调与场景装配器。
+    /// 这样后续逻辑就能围绕这些边界清晰的对象展开，而不是继续把所有细节塞在总控里。
     /// </summary>
     private void InitializeArchitectureModules()
     {
@@ -472,6 +438,14 @@ public class TowerDefenseGame : MonoBehaviour
                 cardRoleSummary: "Frontline Damage",
                 accentColor: new Color(0.28f, 0.78f, 1f, 1f)));
 
+        _inputCoordinator = new TowerDefenseInputCoordinator(
+            isGameOverQuery: () => IsGameOver,
+            tryQuickPlacementAtCurrentMouse: () => _placementInteractionController != null &&
+                                                   _inputCoordinator != null &&
+                                                   _placementInteractionController.TryQuickPlacementAt(_inputCoordinator.GetMouseWorldPosition()),
+            selectRelayTower: SelectRelayTower,
+            selectDefenseTower: SelectDefenseTower,
+            clearSelection: ClearSelection);
         _hudPresenter = new TowerDefenseHudPresenter();
         _placementRules = new TowerPlacementRules(GetPlacementRadius, GetExpansionSquareSize);
         _placementInteractionController = new TowerPlacementInteractionController(
@@ -480,7 +454,9 @@ public class TowerDefenseGame : MonoBehaviour
             canAffordTower: CanAffordTower,
             getPrototype: GetPrototype,
             getTowerDisplayName: GetTowerDisplayName,
-            screenToWorldPosition: ScreenToWorldPosition,
+            screenToWorldPosition: screenPosition => _inputCoordinator != null
+                ? _inputCoordinator.ScreenToWorldPosition(screenPosition)
+                : Vector3.zero,
             validatePlacementPosition: ValidatePlacementPosition,
             getPlacementOverlayWorldBounds: GetPlacementOverlayWorldBounds,
             tryPlaceTowerAt: (worldPosition, towerType) => TryPlaceTowerAt(worldPosition, towerType),
@@ -816,83 +792,6 @@ public class TowerDefenseGame : MonoBehaviour
         Gizmos.DrawWireCube(center, size * 1.04f);
     }
 
-
-    private Vector3 GetMouseWorldPosition()
-    {
-        return ScreenToWorldPosition(Input.mousePosition);
-    }
-
-    /// <summary>
-    /// 把屏幕坐标转换到玩法所在的世界平面。
-    /// </summary>
-    private Vector3 ScreenToWorldPosition(Vector2 screenPosition)
-    {
-        if (_mainCamera == null)
-        {
-            _mainCamera = Camera.main;
-        }
-
-        if (_mainCamera == null)
-        {
-            return Vector3.zero;
-        }
-
-        Vector3 screenPoint = new Vector3(screenPosition.x, screenPosition.y, Mathf.Abs(_mainCamera.transform.position.z));
-        Vector3 worldPosition = _mainCamera.ScreenToWorldPoint(screenPoint);
-        worldPosition.z = 0f;
-        return worldPosition;
-    }
-
-    /// <summary>
-    /// 判断当前鼠标是否压在“会拦截玩法”的 UI 上。
-    /// 这层过滤是为了解决装饰性 UI 误伤拖拽和快速放置的问题。
-    /// </summary>
-    private bool IsPointerOverUserInterface()
-    {
-        if (EventSystem.current == null)
-        {
-            return false;
-        }
-
-        PointerEventData pointerEventData = new PointerEventData(EventSystem.current)
-        {
-            position = Input.mousePosition
-        };
-
-        System.Collections.Generic.List<RaycastResult> raycastResults = new System.Collections.Generic.List<RaycastResult>(8);
-        EventSystem.current.RaycastAll(pointerEventData, raycastResults);
-
-        for (int i = 0; i < raycastResults.Count; i++)
-        {
-            GameObject target = raycastResults[i].gameObject;
-            if (IsGameplayBlockingUserInterface(target))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// 判断某个 UI 对象是否真的应该阻挡玩法输入。
-    /// 这里刻意只把部署卡和 `Selectable` 系交互控件视为阻挡，避免装饰文本、边框或标签误判成 UI 遮挡。
-    /// </summary>
-    private static bool IsGameplayBlockingUserInterface(GameObject target)
-    {
-        if (target == null)
-        {
-            return false;
-        }
-
-        if (target.GetComponentInParent<TowerShopCard>() != null)
-        {
-            return true;
-        }
-
-        return target.GetComponentInParent<Selectable>() != null;
-    }
-
     /// <summary>
     /// 读取塔的建造成本。
     /// 如果目录还没准备好，就返回 `0`，避免空引用把整条购买链路打断。
@@ -977,6 +876,7 @@ public class TowerDefenseGame : MonoBehaviour
         buildZoneReference = _buildZone;
         placedTowerRootReference = _placedTowerRoot;
         placementPreviewRootReference = _placementPreviewRoot;
+        _inputCoordinator?.BindMainCamera(_mainCamera);
 
         if (_mainCamera == null)
         {

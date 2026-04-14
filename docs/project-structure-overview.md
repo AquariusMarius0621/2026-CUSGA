@@ -284,3 +284,20 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - `TowerDefensePresentationCoordinator.cs`：这些状态怎样广播到 HUD 和结算表现
   - `TowerDefenseSceneBootstrapper.cs`：这一关的场景对象怎样装配成可运行状态
   - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链
+
+## 20. 2026-04-14 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerDefenseInputCoordinator.cs`
+  这是当前新增的“输入协调器”。它专门负责：
+  - 热键切塔与取消部署
+  - 已选塔型后的快速点击放置
+  - 屏幕坐标到世界坐标的换算
+  - 鼠标是否压在真正会阻挡玩法的 UI 上
+- 这意味着现在推荐的理解进一步变成：
+  - `TowerDefenseSessionState.cs`：这局现在是什么状态
+  - `TowerPlacementInteractionController.cs`：玩家现在处于什么放置交互阶段
+  - `TowerPlacementBuildExecutor.cs`：确认建塔后，怎么真正把塔落进场景
+  - `TowerDefensePresentationCoordinator.cs`：这些状态怎样广播到 HUD 和结算表现
+  - `TowerDefenseSceneBootstrapper.cs`：这一关的场景对象怎样装配成可运行状态
+  - `TowerDefenseInputCoordinator.cs`：这一局有哪些输入入口，以及输入怎样过滤和换算
+  - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链
