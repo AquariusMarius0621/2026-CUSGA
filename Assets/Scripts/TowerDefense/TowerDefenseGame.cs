@@ -142,6 +142,12 @@ public class TowerDefenseGame : MonoBehaviour
     private TowerDefensePresentationCoordinator _presentationCoordinator;
 
     /// <summary>
+    /// `_sceneBootstrapper` 负责把当前关卡里的显式引用、运行时根节点和兜底对象装配成可用状态。
+    /// 这样总控就不必继续内联整段“场景怎么接线、根节点怎么补、BuildZone 怎么兜底”的启动代码。
+    /// </summary>
+    private TowerDefenseSceneBootstrapper _sceneBootstrapper;
+
+    /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
     /// 总控通过它读配置，而不是把这些常量散落在很多 `switch` 里。
     /// </summary>
@@ -501,6 +507,7 @@ public class TowerDefenseGame : MonoBehaviour
             canAffordTower: CanAffordTower,
             refreshStarterZoneMarker: RefreshStarterZoneMarker);
         _presentationCoordinator.BindPresentation(_hudPresenter, _towerCatalog);
+        _sceneBootstrapper = new TowerDefenseSceneBootstrapper();
     }
 
     /// <summary>
@@ -924,30 +931,52 @@ public class TowerDefenseGame : MonoBehaviour
 
     /// <summary>
     /// 把场景里的显式引用读进总控运行时字段。
-    /// 这里同时会把 HUD 引用转交给 Presenter，并在关键引用缺失时给出清晰警告，方便在 Inspector 里补线。
+    /// 现在具体装配细节已经下沉到 `_sceneBootstrapper`，
+    /// 所以总控这里保留一个稳定门面，负责取回装配结果并继续把它分发给其他运行时子模块。
     /// </summary>
     private void FindSceneReferences()
     {
-        // 这里优先采用 Inspector 已经拖好的显式引用，再把它们同步交给 HUD Presenter。
-        _relayTowerPrototype = relayTowerPrototypeReference;
-        _defenseTowerPrototype = defenseTowerPrototypeReference;
+        if (_sceneBootstrapper == null)
+        {
+            return;
+        }
 
-        _hudPresenter?.BindSceneReferences(
-            energyText: energyTextReference,
-            baseHealthText: baseHealthTextReference,
-            waveText: waveTextReference,
-            selectionText: selectionTextReference,
-            relayTowerButton: relayTowerButtonReference,
-            defenseTowerButton: defenseTowerButtonReference,
-            clearSelectionButton: clearSelectionButtonReference,
-            gameOverPanel: gameOverPanelReference,
-            gameOverTitle: gameOverTitleReference,
-            gameOverHint: gameOverHintReference,
-            dragPreviewPanel: dragPreviewPanelReference,
-            dragPreviewLabel: dragPreviewLabelReference);
+        TowerDefenseSceneBootstrapResult bootstrapResult = _sceneBootstrapper.BootstrapScene(
+            mainCameraReference,
+            relayTowerPrototypeReference,
+            defenseTowerPrototypeReference,
+            placedTowerRootReference,
+            placedTowerRootName,
+            placementPreviewRootReference,
+            placementPreviewRootName,
+            buildZoneReference,
+            buildZoneName,
+            new TowerDefenseHudSceneReferences(
+                energyTextReference,
+                baseHealthTextReference,
+                waveTextReference,
+                selectionTextReference,
+                relayTowerButtonReference,
+                defenseTowerButtonReference,
+                clearSelectionButtonReference,
+                gameOverPanelReference,
+                gameOverTitleReference,
+                gameOverHintReference,
+                dragPreviewPanelReference,
+                dragPreviewLabelReference),
+            _hudPresenter);
 
-        _hudPresenter?.FindSceneReferences();
-        _buildZone = EnsureBuildZoneExists();
+        _mainCamera = bootstrapResult.MainCamera;
+        _relayTowerPrototype = bootstrapResult.RelayTowerPrototype;
+        _defenseTowerPrototype = bootstrapResult.DefenseTowerPrototype;
+        _buildZone = bootstrapResult.BuildZone;
+        _placedTowerRoot = bootstrapResult.PlacedTowerRoot;
+        _placementPreviewRoot = bootstrapResult.PlacementPreviewRoot;
+
+        mainCameraReference = _mainCamera;
+        buildZoneReference = _buildZone;
+        placedTowerRootReference = _placedTowerRoot;
+        placementPreviewRootReference = _placementPreviewRoot;
 
         if (_mainCamera == null)
         {
@@ -960,49 +989,16 @@ public class TowerDefenseGame : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 让规则层和可视化层继续拿到当前真正可用的运行时根节点。
+    /// 由于根节点的确保存在已经由 `_sceneBootstrapper` 处理，
+    /// 这里主要负责把结果同步给其他子模块，而不是继续自己创建对象。
+    /// </summary>
     private void EnsureRuntimeRoots()
     {
-        _placedTowerRoot = EnsureRuntimeRoot(placedTowerRootReference, placedTowerRootName);
-        _placementPreviewRoot = EnsureRuntimeRoot(placementPreviewRootReference, placementPreviewRootName);
-
         placedTowerRootReference = _placedTowerRoot;
         placementPreviewRootReference = _placementPreviewRoot;
         RefreshPlacementRuleContext();
         _placementVisualController?.BindPlacementPreviewRoot(_placementPreviewRoot);
-    }
-
-    /// <summary>
-    /// 确保某个运行时根节点一定存在。
-    /// 如果场景里已经显式拖好了引用，就直接复用；否则按约定名称新建一个父节点，给运行时塔和预览对象提供稳定挂点。
-    /// </summary>
-    private static Transform EnsureRuntimeRoot(Transform existingReference, string objectName)
-    {
-        if (existingReference != null)
-        {
-            return existingReference;
-        }
-
-        GameObject runtimeRoot = new GameObject(objectName);
-        return runtimeRoot.transform;
-    }
-
-    private BuildZone EnsureBuildZoneExists()
-    {
-        if (buildZoneReference != null)
-        {
-            return buildZoneReference;
-        }
-
-        Debug.LogWarning("TowerDefenseGame is missing BuildZone reference. Creating a temporary runtime BuildZone fallback.");
-
-        GameObject buildZoneObject = new GameObject(buildZoneName);
-        buildZoneObject.transform.position = new Vector3(0f, 0.25f, 0f);
-
-        BoxCollider2D boxCollider = buildZoneObject.AddComponent<BoxCollider2D>();
-        boxCollider.isTrigger = true;
-        boxCollider.size = new Vector2(18f, 10.5f);
-
-        buildZoneReference = buildZoneObject.AddComponent<BuildZone>();
-        return buildZoneReference;
     }
 }
