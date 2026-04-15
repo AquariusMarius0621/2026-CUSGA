@@ -1,5 +1,5 @@
 ﻿# Tower Defense Project Structure Overview
-Updated: 2026-04-14
+Updated: 2026-04-15
 Audience: 缁欓」鐩淮鎶よ€呯湅鐨勭粨鏋勮鏄庢枃妗ｃ€?Goal: 鐢ㄦ洿濂借鐨勬柟寮忚娓呮褰撳墠椤圭洰鐢卞摢浜涘満鏅€佽剼鏈€乁I銆佹枃妗ｅ拰宸ュ叿缁勬垚锛屼互鍙婂畠浠€庝箞鍗忎綔銆?
 ## 1. 涓€鍙ヨ瘽鐞嗚В杩欎釜椤圭洰
 杩欐槸涓€涓?Unity 2022.3 鐨?2D 濉旈槻鍘熷瀷椤圭洰銆?褰撳墠鏍稿績鐗硅壊鏄細
@@ -301,3 +301,21 @@ Unity 鐗堟湰閿佸畾锛岀洰鍓嶉」鐩娇鐢?`2022.3.62f3c1`銆?
   - `TowerDefenseSceneBootstrapper.cs`：这一关的场景对象怎样装配成可运行状态
   - `TowerDefenseInputCoordinator.cs`：这一局有哪些输入入口，以及输入怎样过滤和换算
   - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链
+
+## 21. 2026-04-15 结构补充
+
+- `Assets/Scripts/TowerDefense/TowerPlacementSupportCoordinator.cs`
+  这是最后一轮新增的“放置支持协调器”。它专门负责：
+  - 放置规则入口桥接
+  - 塔静态定义查询，例如造价、显示名、占地半径、扩张方格边长、原型体
+  - 合法区覆盖层的预热、失效与隐藏
+  - 首塔起手区标记刷新、编辑器 Gizmo 绘制与起手区轻量自检
+- 到这一轮为止，更推荐把项目理解成：
+  - `TowerDefenseSessionState.cs`：这局现在是什么状态
+  - `TowerPlacementInteractionController.cs`：玩家现在处于什么放置交互阶段
+  - `TowerPlacementBuildExecutor.cs`：确认建塔后，怎么真正把塔落进场景
+  - `TowerDefensePresentationCoordinator.cs`：这些状态怎样广播到 HUD 和结算表现
+  - `TowerDefenseSceneBootstrapper.cs`：这一关的场景对象怎样装配成可运行状态
+  - `TowerDefenseInputCoordinator.cs`：这一局有哪些输入入口，以及输入怎样过滤和换算
+  - `TowerPlacementSupportCoordinator.cs`：放置链剩下的支持型能力怎样统一桥接
+  - `TowerDefenseGame.cs`：把这些模块装配成完整玩法主链，并保留对外兼容门面

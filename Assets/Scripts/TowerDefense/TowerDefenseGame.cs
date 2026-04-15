@@ -154,6 +154,13 @@ public class TowerDefenseGame : MonoBehaviour
     private TowerDefenseInputCoordinator _inputCoordinator;
 
     /// <summary>
+    /// `_placementSupportCoordinator` 负责放置链里剩下的支持型能力，
+    /// 例如：起手区标记、合法区预热、塔静态定义查询、规则桥接与起手区自检。
+    /// 这是让总控在最后一轮尽量收敛成“装配层”的关键一步。
+    /// </summary>
+    private TowerPlacementSupportCoordinator _placementSupportCoordinator;
+
+    /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
     /// 总控通过它读配置，而不是把这些常量散落在很多 `switch` 里。
     /// </summary>
@@ -215,11 +222,11 @@ public class TowerDefenseGame : MonoBehaviour
     {
         FindSceneReferences();
         EnsureRuntimeRoots();
-        RefreshPlacementRuleContext();
+        _placementSupportCoordinator?.RefreshPlacementRuleContext();
         InitializePlacementVisuals();
         _presentationCoordinator?.InitializePresentation("Place your first structure in the starter zone. Drag a Generator or Turret into a highlighted legal area. Hotkeys: 1 / 2.");
-        HidePlacementAreaOverlay();
-        RunStarterPlacementSanityCheck();
+        _placementSupportCoordinator?.HidePlacementAreaOverlay();
+        _placementSupportCoordinator?.RunStarterPlacementSanityCheck();
     }
 
     /// <summary>
@@ -376,7 +383,8 @@ public class TowerDefenseGame : MonoBehaviour
             return false;
         }
 
-        return _sessionState != null && _sessionState.CanAfford(GetTowerCost(towerType));
+        return _sessionState != null &&
+               _sessionState.CanAfford(_placementSupportCoordinator != null ? _placementSupportCoordinator.GetTowerCost(towerType) : 0);
     }
 
 
@@ -400,16 +408,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void RunStarterPlacementSanityCheck()
     {
-        if (IsGameOver)
-        {
-            return;
-        }
-
-        Vector3 starterWorldPosition = new Vector3(initialPlacementSquareCenter.x, initialPlacementSquareCenter.y, 0f);
-        bool relayValid = ValidatePlacementPosition(starterWorldPosition, TowerType.Relay, out string relayReason);
-        bool defenseValid = ValidatePlacementPosition(starterWorldPosition, TowerType.Defense, out string defenseReason);
-
-        LogPlacementDiagnostic($"Starter sanity check: center={starterWorldPosition} relayValid={relayValid} relayReason={relayReason} defenseValid={defenseValid} defenseReason={defenseReason}");
+        _placementSupportCoordinator?.RunStarterPlacementSanityCheck();
     }
 
 
@@ -438,6 +437,23 @@ public class TowerDefenseGame : MonoBehaviour
                 cardRoleSummary: "Frontline Damage",
                 accentColor: new Color(0.28f, 0.78f, 1f, 1f)));
 
+        _placementRules = new TowerPlacementRules(
+            towerType => _placementSupportCoordinator != null ? _placementSupportCoordinator.GetPlacementRadius(towerType) : 0.5f,
+            towerType => _placementSupportCoordinator != null ? _placementSupportCoordinator.GetExpansionSquareSize(towerType) : 4.5f);
+        _placementSupportCoordinator = new TowerPlacementSupportCoordinator(
+            initialPlacementSquareCenter,
+            initialPlacementSquareSize,
+            starterZoneMarkerFillColor,
+            starterZoneMarkerEdgeColor,
+            towerCatalogQuery: () => _towerCatalog,
+            placementRulesQuery: () => _placementRules,
+            placementVisualControllerQuery: () => _placementVisualController,
+            placedTowerRootQuery: () => _placedTowerRoot != null ? _placedTowerRoot : placedTowerRootReference,
+            buildZoneQuery: () => _buildZone != null ? _buildZone : buildZoneReference,
+            relayTowerPrototypeQuery: () => _relayTowerPrototype,
+            defenseTowerPrototypeQuery: () => _defenseTowerPrototype,
+            isGameOverQuery: () => IsGameOver,
+            logPlacementDiagnostic: LogPlacementDiagnostic);
         _inputCoordinator = new TowerDefenseInputCoordinator(
             isGameOverQuery: () => IsGameOver,
             tryQuickPlacementAtCurrentMouse: () => _placementInteractionController != null &&
@@ -447,7 +463,6 @@ public class TowerDefenseGame : MonoBehaviour
             selectDefenseTower: SelectDefenseTower,
             clearSelection: ClearSelection);
         _hudPresenter = new TowerDefenseHudPresenter();
-        _placementRules = new TowerPlacementRules(GetPlacementRadius, GetExpansionSquareSize);
         _placementInteractionController = new TowerPlacementInteractionController(
             isGameOverQuery: () => _sessionState != null && _sessionState.IsGameOver,
             currentEnergyQuery: () => _sessionState != null ? _sessionState.CurrentEnergy : 0,
@@ -481,7 +496,7 @@ public class TowerDefenseGame : MonoBehaviour
             sessionStateQuery: () => _sessionState,
             interactionControllerQuery: () => _placementInteractionController,
             canAffordTower: CanAffordTower,
-            refreshStarterZoneMarker: RefreshStarterZoneMarker);
+            refreshStarterZoneMarker: () => _placementSupportCoordinator?.RefreshStarterZoneMarker());
         _presentationCoordinator.BindPresentation(_hudPresenter, _towerCatalog);
         _sceneBootstrapper = new TowerDefenseSceneBootstrapper();
     }
@@ -522,8 +537,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void RefreshPlacementRuleContext()
     {
-        _placementRules?.BindSceneReferences(_buildZone, _placedTowerRoot);
-        _placementRules?.ConfigureStarterZone(initialPlacementSquareCenter, initialPlacementSquareSize);
+        _placementSupportCoordinator?.RefreshPlacementRuleContext();
     }
 
     /// <summary>
@@ -575,17 +589,13 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private bool ValidatePlacementPosition(Vector3 worldPosition, TowerType towerType, out string invalidReason)
     {
-        if (_placementRules == null)
+        if (_placementSupportCoordinator != null)
         {
-            invalidReason = "Placement rules are not initialized.";
-            return false;
+            return _placementSupportCoordinator.ValidatePlacementPosition(worldPosition, towerType, out invalidReason);
         }
 
-        return _placementRules.ValidatePlacementPosition(
-            worldPosition,
-            towerType,
-            ShouldIgnorePlacementTransform,
-            out invalidReason);
+        invalidReason = "Placement support is not initialized.";
+        return false;
 #if false
         invalidReason = string.Empty;
 
@@ -655,7 +665,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private bool ShouldIgnorePlacementTransform(Transform candidate)
     {
-        return _placementVisualController != null && _placementVisualController.ContainsPreviewTransform(candidate);
+        return _placementSupportCoordinator != null && _placementSupportCoordinator.ShouldIgnorePlacementTransform(candidate);
     }
 
     /// <summary>
@@ -663,8 +673,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private float GetPlacementRadius(TowerType towerType)
     {
-        TowerDefinition definition = _towerCatalog != null ? _towerCatalog.GetDefinition(towerType) : null;
-        return definition != null ? definition.PlacementRadius : 0.5f;
+        return _placementSupportCoordinator != null ? _placementSupportCoordinator.GetPlacementRadius(towerType) : 0.5f;
     }
 
     /// <summary>
@@ -672,8 +681,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private float GetExpansionSquareSize(TowerType towerType)
     {
-        TowerDefinition definition = _towerCatalog != null ? _towerCatalog.GetDefinition(towerType) : null;
-        return definition != null ? definition.ExpansionSquareSize : 4.5f;
+        return _placementSupportCoordinator != null ? _placementSupportCoordinator.GetExpansionSquareSize(towerType) : 4.5f;
     }
 
     /// <summary>
@@ -683,12 +691,9 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private Bounds GetPlacementOverlayWorldBounds(TowerType towerType)
     {
-        if (_placementRules == null)
-        {
-            return new Bounds(Vector3.zero, Vector3.zero);
-        }
-
-        return _placementRules.GetPlacementOverlayWorldBounds(towerType);
+        return _placementSupportCoordinator != null
+            ? _placementSupportCoordinator.GetPlacementOverlayWorldBounds(towerType)
+            : new Bounds(Vector3.zero, Vector3.zero);
     }
 
     /// <summary>
@@ -698,7 +703,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void PrewarmPlacementAreaOverlay(TowerType towerType)
     {
-        _placementInteractionController?.PrewarmPlacementAreaOverlay(towerType);
+        _placementSupportCoordinator?.PrewarmPlacementAreaOverlay(towerType);
     }
 
     /// <summary>
@@ -707,7 +712,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void InvalidatePlacementAreaOverlayCache()
     {
-        _placementVisualController?.InvalidatePlacementAreaOverlayCache();
+        _placementSupportCoordinator?.InvalidatePlacementAreaOverlayCache();
     }
 
     /// <summary>
@@ -715,7 +720,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void HidePlacementAreaOverlay()
     {
-        _placementVisualController?.HidePlacementAreaOverlay();
+        _placementSupportCoordinator?.HidePlacementAreaOverlay();
     }
 
     /// <summary>
@@ -724,10 +729,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private void RefreshStarterZoneMarker()
     {
-        Bounds starterBounds = _placementRules != null
-            ? _placementRules.GetStarterZoneBounds()
-            : TowerPlacementRules.CreateSquareBounds(initialPlacementSquareCenter, initialPlacementSquareSize);
-        _placementVisualController?.RefreshStarterZoneMarker(!IsGameOver && ShouldShowStarterZoneMarker(), starterBounds);
+        _placementSupportCoordinator?.RefreshStarterZoneMarker();
     }
 
     /// <summary>
@@ -736,13 +738,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private bool ShouldShowStarterZoneMarker()
     {
-        if (_placementRules != null)
-        {
-            return _placementRules.ShouldShowStarterZoneMarker();
-        }
-
-        Transform placedTowerRoot = _placedTowerRoot != null ? _placedTowerRoot : placedTowerRootReference;
-        return placedTowerRoot == null || placedTowerRoot.childCount == 0;
+        return _placementSupportCoordinator != null && _placementSupportCoordinator.ShouldShowStarterZoneMarker();
     }
 
     /// <summary>
@@ -756,7 +752,7 @@ public class TowerDefenseGame : MonoBehaviour
             return;
         }
 
-        DrawStarterZoneGizmo();
+        _placementSupportCoordinator?.DrawStarterZoneGizmo();
     }
 
     /// <summary>
@@ -769,27 +765,7 @@ public class TowerDefenseGame : MonoBehaviour
             return;
         }
 
-        DrawStarterZoneGizmo();
-    }
-
-    /// <summary>
-    /// 在 Scene 视图里画出首塔起手区的方形 Gizmo。
-    /// </summary>
-    private void DrawStarterZoneGizmo()
-    {
-        Vector3 center = new Vector3(initialPlacementSquareCenter.x, initialPlacementSquareCenter.y, 0f);
-        Vector3 size = new Vector3(initialPlacementSquareSize, initialPlacementSquareSize, 0.01f);
-
-        Color fillColor = starterZoneMarkerFillColor;
-        fillColor.a = Mathf.Max(fillColor.a, 0.3f);
-        Gizmos.color = fillColor;
-        Gizmos.DrawCube(center, size);
-
-        Color edgeColor = starterZoneMarkerEdgeColor;
-        edgeColor.a = 1f;
-        Gizmos.color = edgeColor;
-        Gizmos.DrawWireCube(center, size);
-        Gizmos.DrawWireCube(center, size * 1.04f);
+        _placementSupportCoordinator?.DrawStarterZoneGizmo();
     }
 
     /// <summary>
@@ -798,8 +774,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private int GetTowerCost(TowerType towerType)
     {
-        TowerDefinition definition = _towerCatalog != null ? _towerCatalog.GetDefinition(towerType) : null;
-        return definition != null ? definition.BuildCost : 0;
+        return _placementSupportCoordinator != null ? _placementSupportCoordinator.GetTowerCost(towerType) : 0;
     }
 
     /// <summary>
@@ -808,8 +783,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private string GetTowerDisplayName(TowerType towerType)
     {
-        TowerDefinition definition = _towerCatalog != null ? _towerCatalog.GetDefinition(towerType) : null;
-        return definition != null ? definition.DisplayName : "None";
+        return _placementSupportCoordinator != null ? _placementSupportCoordinator.GetTowerDisplayName(towerType) : "None";
     }
 
     /// <summary>
@@ -817,15 +791,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     private GameObject GetPrototype(TowerType towerType)
     {
-        switch (towerType)
-        {
-            case TowerType.Relay:
-                return _relayTowerPrototype;
-            case TowerType.Defense:
-                return _defenseTowerPrototype;
-            default:
-                return null;
-        }
+        return _placementSupportCoordinator != null ? _placementSupportCoordinator.GetPrototype(towerType) : null;
     }
 
     /// <summary>
