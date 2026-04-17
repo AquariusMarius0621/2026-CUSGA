@@ -18,6 +18,7 @@ public sealed class TowerDefensePresentationCoordinator
 {
     private readonly Func<TowerDefenseSessionState> _sessionStateQuery;
     private readonly Func<TowerPlacementInteractionController> _interactionControllerQuery;
+    private readonly Func<PlacedStructureHudState> _placedStructureHudStateQuery;
     private readonly Func<TowerType, bool> _canAffordTower;
     private readonly Action _refreshStarterZoneMarker;
 
@@ -27,11 +28,13 @@ public sealed class TowerDefensePresentationCoordinator
     public TowerDefensePresentationCoordinator(
         Func<TowerDefenseSessionState> sessionStateQuery,
         Func<TowerPlacementInteractionController> interactionControllerQuery,
+        Func<PlacedStructureHudState> placedStructureHudStateQuery,
         Func<TowerType, bool> canAffordTower,
         Action refreshStarterZoneMarker)
     {
         _sessionStateQuery = sessionStateQuery;
         _interactionControllerQuery = interactionControllerQuery;
+        _placedStructureHudStateQuery = placedStructureHudStateQuery;
         _canAffordTower = canAffordTower;
         _refreshStarterZoneMarker = refreshStarterZoneMarker;
     }
@@ -145,7 +148,10 @@ public sealed class TowerDefensePresentationCoordinator
             totalWaves: sessionState != null ? sessionState.TotalWaves : 0,
             selectedTowerType: selectedTowerType,
             isPlacementDragActive: isPlacementDragActive,
-            dragTowerType: dragTowerType);
+            dragTowerType: dragTowerType,
+            placedStructureState: _placedStructureHudStateQuery != null
+                ? _placedStructureHudStateQuery()
+                : new PlacedStructureHudState(false, string.Empty, string.Empty));
     }
 
     /// <summary>

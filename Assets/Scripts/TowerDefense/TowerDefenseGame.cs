@@ -32,7 +32,7 @@ public class TowerDefenseGame : MonoBehaviour
     [Header("Core Rules")]
     [SerializeField] private int startingEnergy = 80;
     [SerializeField] private int startingBaseHealth = 10;
-    [SerializeField] private int relayTowerCost = 30;
+    [SerializeField] private int relayTowerCost = 0;
     [SerializeField] private int defenseTowerCost = 45;
 
     [Header("Placement Rules")]
@@ -74,6 +74,7 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private Transform placedTowerRootReference;
     [SerializeField] private Transform placementPreviewRootReference;
     [SerializeField] private BuildZone buildZoneReference;
+    [SerializeField] private BattlefieldMapDefinition battlefieldMapReference;
 
     [Header("Scene Object Names")]
     [SerializeField] private string placedTowerRootName = "PlacedTowers";
@@ -110,9 +111,11 @@ public class TowerDefenseGame : MonoBehaviour
     private GameObject _defenseTowerPrototype;
     private Camera _mainCamera;
     private BuildZone _buildZone;
+    private BattlefieldMapDefinition _battlefieldMapDefinition;
     private Transform _placedTowerRoot;
     private Transform _placementPreviewRoot;
     private TowerPlacementRules _placementRules;
+    private TowerPowerGridCoordinator _powerGridCoordinator;
 
     /// <summary>
     /// `_placementVisualController` 负责放置阶段的可视化反馈。
@@ -159,6 +162,8 @@ public class TowerDefenseGame : MonoBehaviour
     /// 这是让总控在最后一轮尽量收敛成“装配层”的关键一步。
     /// </summary>
     private TowerPlacementSupportCoordinator _placementSupportCoordinator;
+    private RelayTower _selectedRelayTower;
+    private DefenseTower _selectedDefenseTower;
 
     /// <summary>
     /// `_towerCatalog` 提供塔的静态定义，例如显示名、造价、占地半径和扩张方格边长。
@@ -224,9 +229,10 @@ public class TowerDefenseGame : MonoBehaviour
         EnsureRuntimeRoots();
         _placementSupportCoordinator?.RefreshPlacementRuleContext();
         InitializePlacementVisuals();
-        _presentationCoordinator?.InitializePresentation("Place your first structure in the starter zone. Drag a Generator or Turret into a highlighted legal area. Hotkeys: 1 / 2.");
+        _presentationCoordinator?.InitializePresentation("Place a relay on any empty ground, then deploy turrets inside relay coverage. Hotkeys: 1 / 2.");
         _placementSupportCoordinator?.HidePlacementAreaOverlay();
         _placementSupportCoordinator?.RunStarterPlacementSanityCheck();
+        _powerGridCoordinator?.RecalculatePowerDistribution();
     }
 
     /// <summary>
@@ -352,6 +358,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void SelectRelayTower()
     {
+        ClearPlacedStructureSelection();
         _placementInteractionController?.SelectRelayTower();
     }
 
@@ -360,6 +367,7 @@ public class TowerDefenseGame : MonoBehaviour
     /// </summary>
     public void SelectDefenseTower()
     {
+        ClearPlacedStructureSelection();
         _placementInteractionController?.SelectDefenseTower();
     }
 
@@ -370,6 +378,8 @@ public class TowerDefenseGame : MonoBehaviour
     public void ClearSelection()
     {
         _placementInteractionController?.ClearSelection();
+        ClearPlacedStructureSelection();
+        RefreshHud();
     }
 
     /// <summary>
@@ -385,6 +395,91 @@ public class TowerDefenseGame : MonoBehaviour
 
         return _sessionState != null &&
                _sessionState.CanAfford(_placementSupportCoordinator != null ? _placementSupportCoordinator.GetTowerCost(towerType) : 0);
+    }
+
+    public bool TryUpgradeSelectedStructure()
+    {
+        if (_sessionState == null || _powerGridCoordinator == null || IsGameOver)
+        {
+            return false;
+        }
+
+        if (_selectedRelayTower != null)
+        {
+            if (!_powerGridCoordinator.CanUpgradeRelay(
+                    _selectedRelayTower,
+                    _sessionState.CurrentEnergy,
+                    out int upgradeCost,
+                    out string invalidReason))
+            {
+                SetStatusMessage(invalidReason);
+                RefreshHud();
+                return false;
+            }
+
+            _sessionState.SetCurrentEnergy(_sessionState.CurrentEnergy - upgradeCost);
+            _powerGridCoordinator.ApplyRelayUpgrade(_selectedRelayTower);
+            SetStatusMessage($"Relay #{_selectedRelayTower.RelayNumber} upgraded to LV {_selectedRelayTower.CurrentLevel}.");
+            InvalidatePlacementAreaOverlayCache();
+            RefreshHud();
+            return true;
+        }
+
+        if (_selectedDefenseTower != null)
+        {
+            if (!_powerGridCoordinator.CanUpgradeDefenseTower(
+                    _selectedDefenseTower,
+                    _sessionState.CurrentEnergy,
+                    out int upgradeCost,
+                    out string invalidReason))
+            {
+                SetStatusMessage(invalidReason);
+                RefreshHud();
+                return false;
+            }
+
+            _sessionState.SetCurrentEnergy(_sessionState.CurrentEnergy - upgradeCost);
+            _powerGridCoordinator.ApplyDefenseTowerUpgrade(_selectedDefenseTower);
+            SetStatusMessage($"Defense tower #{_selectedDefenseTower.TowerNumber} upgraded to LV {_selectedDefenseTower.CurrentLevel}.");
+            RefreshHud();
+            return true;
+        }
+
+        SetStatusMessage("Select a placed relay or defense tower first.");
+        return false;
+    }
+
+    public bool TryDemolishSelectedStructure()
+    {
+        if (IsGameOver)
+        {
+            return false;
+        }
+
+        if (_selectedRelayTower != null)
+        {
+            RelayTower relayTower = _selectedRelayTower;
+            ClearPlacedStructureSelection();
+            Destroy(relayTower.gameObject);
+            InvalidatePlacementAreaOverlayCache();
+            SetStatusMessage($"Relay #{relayTower.RelayNumber} dismantled.");
+            RefreshHud();
+            return true;
+        }
+
+        if (_selectedDefenseTower != null)
+        {
+            DefenseTower defenseTower = _selectedDefenseTower;
+            ClearPlacedStructureSelection();
+            Destroy(defenseTower.gameObject);
+            InvalidatePlacementAreaOverlayCache();
+            SetStatusMessage($"Defense tower #{defenseTower.TowerNumber} dismantled.");
+            RefreshHud();
+            return true;
+        }
+
+        SetStatusMessage("Select a placed relay or defense tower first.");
+        return false;
     }
 
 
@@ -426,7 +521,7 @@ public class TowerDefenseGame : MonoBehaviour
                 buildCost: relayTowerCost,
                 placementRadius: relayPlacementRadius,
                 expansionSquareSize: relayExpansionSquareSize,
-                cardRoleSummary: "Generator / Power Income",
+                cardRoleSummary: "Relay Node / Supply Grid",
                 accentColor: new Color(1f, 0.55f, 0.22f, 1f)),
             defenseDefinition: new TowerDefinition(
                 towerType: TowerType.Defense,
@@ -452,13 +547,19 @@ public class TowerDefenseGame : MonoBehaviour
             buildZoneQuery: () => _buildZone != null ? _buildZone : buildZoneReference,
             relayTowerPrototypeQuery: () => _relayTowerPrototype,
             defenseTowerPrototypeQuery: () => _defenseTowerPrototype,
+            powerGridCoordinatorQuery: () => _powerGridCoordinator,
             isGameOverQuery: () => IsGameOver,
             logPlacementDiagnostic: LogPlacementDiagnostic);
+        _powerGridCoordinator = new TowerPowerGridCoordinator(
+            mapDefinitionQuery: () => _battlefieldMapDefinition != null ? _battlefieldMapDefinition : battlefieldMapReference,
+            logDiagnostic: LogPlacementDiagnostic);
         _inputCoordinator = new TowerDefenseInputCoordinator(
             isGameOverQuery: () => IsGameOver,
             tryQuickPlacementAtCurrentMouse: () => _placementInteractionController != null &&
                                                    _inputCoordinator != null &&
                                                    _placementInteractionController.TryQuickPlacementAt(_inputCoordinator.GetMouseWorldPosition()),
+            tryUpgradeSelectedStructure: TryUpgradeSelectedStructure,
+            tryDemolishSelectedStructure: TryDemolishSelectedStructure,
             selectRelayTower: SelectRelayTower,
             selectDefenseTower: SelectDefenseTower,
             clearSelection: ClearSelection);
@@ -488,6 +589,7 @@ public class TowerDefenseGame : MonoBehaviour
             getPlacedTowerRoot: () => _placedTowerRoot,
             getPlacementRadius: GetPlacementRadius,
             validatePlacementPosition: ValidatePlacementPosition,
+            registerPlacedStructure: (structureObject, towerType) => _powerGridCoordinator?.RegisterPlacedStructure(structureObject, towerType),
             invalidatePlacementAreaOverlayCache: InvalidatePlacementAreaOverlayCache,
             refreshHud: RefreshHud,
             setStatusMessage: SetStatusMessage,
@@ -495,6 +597,7 @@ public class TowerDefenseGame : MonoBehaviour
         _presentationCoordinator = new TowerDefensePresentationCoordinator(
             sessionStateQuery: () => _sessionState,
             interactionControllerQuery: () => _placementInteractionController,
+            placedStructureHudStateQuery: BuildPlacedStructureHudState,
             canAffordTower: CanAffordTower,
             refreshStarterZoneMarker: () => _placementSupportCoordinator?.RefreshStarterZoneMarker());
         _presentationCoordinator.BindPresentation(_hudPresenter, _towerCatalog);
@@ -548,6 +651,95 @@ public class TowerDefenseGame : MonoBehaviour
     private void RefreshHud()
     {
         _presentationCoordinator?.RefreshHud();
+    }
+
+    public void NotifyStructureTopologyChanged()
+    {
+        if (_selectedRelayTower == null)
+        {
+            _selectedRelayTower = null;
+        }
+
+        if (_selectedDefenseTower == null)
+        {
+            _selectedDefenseTower = null;
+        }
+
+        _powerGridCoordinator?.NotifyTopologyChanged();
+        RefreshHud();
+    }
+
+    private void ClearPlacedStructureSelection()
+    {
+        _selectedRelayTower = null;
+        _selectedDefenseTower = null;
+    }
+
+    private PlacedStructureHudState BuildPlacedStructureHudState()
+    {
+        if (_selectedRelayTower != null)
+        {
+            int upgradeCost = 0;
+            string invalidReason = string.Empty;
+            bool canUpgrade = _powerGridCoordinator != null &&
+                              _sessionState != null &&
+                              _powerGridCoordinator.CanUpgradeRelay(_selectedRelayTower, _sessionState.CurrentEnergy, out upgradeCost, out invalidReason);
+            string detail = $"Relay #{_selectedRelayTower.RelayNumber} / LV {_selectedRelayTower.CurrentLevel} / Load {_selectedRelayTower.CurrentAssignedLoad}/{_selectedRelayTower.SupplyCapacity}";
+            detail += canUpgrade
+                ? $"\nU Upgrade ({upgradeCost} EN) / Delete Dismantle"
+                : $"\n{invalidReason}";
+            return new PlacedStructureHudState(true, "Relay Node", detail);
+        }
+
+        if (_selectedDefenseTower != null)
+        {
+            int upgradeCost = 0;
+            string invalidReason = string.Empty;
+            string powerState = _selectedDefenseTower.IsPowered
+                ? $"ONLINE / Relay #{(_selectedDefenseTower.AssignedRelay != null ? _selectedDefenseTower.AssignedRelay.RelayNumber : 0)}"
+                : "OFFLINE / No stable supply";
+            bool canUpgrade = _powerGridCoordinator != null &&
+                              _sessionState != null &&
+                              _powerGridCoordinator.CanUpgradeDefenseTower(_selectedDefenseTower, _sessionState.CurrentEnergy, out upgradeCost, out invalidReason);
+            string detail = $"Turret #{_selectedDefenseTower.TowerNumber} / LV {_selectedDefenseTower.CurrentLevel} / {powerState}";
+            detail += $"\nPower { _selectedDefenseTower.PowerRequired } / Damage { _selectedDefenseTower.DamagePerShot }";
+            detail += canUpgrade
+                ? $"\nU Upgrade ({upgradeCost} EN) / Delete Dismantle"
+                : $"\n{invalidReason}";
+            return new PlacedStructureHudState(true, "Defense Tower", detail);
+        }
+
+        return new PlacedStructureHudState(false, string.Empty, string.Empty);
+    }
+
+    public void SelectPlacedStructure(RelayTower relayTower)
+    {
+        if (relayTower == null || IsGameOver)
+        {
+            return;
+        }
+
+        _placementInteractionController?.CancelPlacementDrag();
+        _placementInteractionController?.SetSelectionSilently(TowerType.None);
+        _selectedRelayTower = relayTower;
+        _selectedDefenseTower = null;
+        SetStatusMessage($"Selected relay #{relayTower.RelayNumber}. Press U to upgrade or Delete to dismantle.");
+        RefreshHud();
+    }
+
+    public void SelectPlacedStructure(DefenseTower defenseTower)
+    {
+        if (defenseTower == null || IsGameOver)
+        {
+            return;
+        }
+
+        _placementInteractionController?.CancelPlacementDrag();
+        _placementInteractionController?.SetSelectionSilently(TowerType.None);
+        _selectedDefenseTower = defenseTower;
+        _selectedRelayTower = null;
+        SetStatusMessage($"Selected defense tower #{defenseTower.TowerNumber}. Press U to upgrade or Delete to dismantle.");
+        RefreshHud();
     }
 
     /// <summary>
@@ -837,12 +1029,15 @@ public class TowerDefenseGame : MonoBehaviour
         _buildZone = bootstrapResult.BuildZone;
         _placedTowerRoot = bootstrapResult.PlacedTowerRoot;
         _placementPreviewRoot = bootstrapResult.PlacementPreviewRoot;
+        _battlefieldMapDefinition = battlefieldMapReference != null ? battlefieldMapReference : FindFirstObjectByType<BattlefieldMapDefinition>();
 
         mainCameraReference = _mainCamera;
         buildZoneReference = _buildZone;
         placedTowerRootReference = _placedTowerRoot;
         placementPreviewRootReference = _placementPreviewRoot;
+        battlefieldMapReference = _battlefieldMapDefinition;
         _inputCoordinator?.BindMainCamera(_mainCamera);
+        _powerGridCoordinator?.BindPlacedTowerRoot(_placedTowerRoot);
 
         if (_mainCamera == null)
         {

@@ -91,11 +91,6 @@ public sealed class TowerPlacementRules
             return false;
         }
 
-        if (!IsWithinPlacementNetwork(worldPosition, out invalidReason))
-        {
-            return false;
-        }
-
         float placementRadius = _getPlacementRadius != null ? _getPlacementRadius(towerType) : 0f;
         int overlapCount = Physics2D.OverlapCircleNonAlloc(worldPosition, placementRadius, _placementValidationOverlapBuffer);
         for (int i = 0; i < overlapCount; i++)

@@ -37,6 +37,7 @@ public sealed class TowerPlacementBuildExecutor
     private readonly Func<Transform> _getPlacedTowerRoot;
     private readonly Func<TowerType, float> _getPlacementRadius;
     private readonly PlacementValidator _validatePlacementPosition;
+    private readonly Action<GameObject, TowerType> _registerPlacedStructure;
     private readonly Action _invalidatePlacementAreaOverlayCache;
     private readonly Action _refreshHud;
     private readonly Action<string> _setStatusMessage;
@@ -56,6 +57,7 @@ public sealed class TowerPlacementBuildExecutor
         Func<Transform> getPlacedTowerRoot,
         Func<TowerType, float> getPlacementRadius,
         PlacementValidator validatePlacementPosition,
+        Action<GameObject, TowerType> registerPlacedStructure,
         Action invalidatePlacementAreaOverlayCache,
         Action refreshHud,
         Action<string> setStatusMessage,
@@ -70,6 +72,7 @@ public sealed class TowerPlacementBuildExecutor
         _getPlacedTowerRoot = getPlacedTowerRoot;
         _getPlacementRadius = getPlacementRadius;
         _validatePlacementPosition = validatePlacementPosition;
+        _registerPlacedStructure = registerPlacedStructure;
         _invalidatePlacementAreaOverlayCache = invalidatePlacementAreaOverlayCache;
         _refreshHud = refreshHud;
         _setStatusMessage = setStatusMessage;
@@ -158,6 +161,7 @@ public sealed class TowerPlacementBuildExecutor
             placedTower.Initialize(ownerPad, towerType);
         }
 
+        _registerPlacedStructure?.Invoke(tower, towerType);
         _setCurrentEnergy?.Invoke(currentEnergy - cost);
         _invalidatePlacementAreaOverlayCache?.Invoke();
         _setStatusMessage?.Invoke($"Deployed {towerDisplayName} for {cost} EN.");

@@ -33,6 +33,7 @@ public sealed class TowerPlacementSupportCoordinator
     private readonly Func<BuildZone> _buildZoneQuery;
     private readonly Func<GameObject> _relayTowerPrototypeQuery;
     private readonly Func<GameObject> _defenseTowerPrototypeQuery;
+    private readonly Func<TowerPowerGridCoordinator> _powerGridCoordinatorQuery;
     private readonly Func<bool> _isGameOverQuery;
     private readonly Action<string> _logPlacementDiagnostic;
 
@@ -48,6 +49,7 @@ public sealed class TowerPlacementSupportCoordinator
         Func<BuildZone> buildZoneQuery,
         Func<GameObject> relayTowerPrototypeQuery,
         Func<GameObject> defenseTowerPrototypeQuery,
+        Func<TowerPowerGridCoordinator> powerGridCoordinatorQuery,
         Func<bool> isGameOverQuery,
         Action<string> logPlacementDiagnostic)
     {
@@ -62,6 +64,7 @@ public sealed class TowerPlacementSupportCoordinator
         _buildZoneQuery = buildZoneQuery;
         _relayTowerPrototypeQuery = relayTowerPrototypeQuery;
         _defenseTowerPrototypeQuery = defenseTowerPrototypeQuery;
+        _powerGridCoordinatorQuery = powerGridCoordinatorQuery;
         _isGameOverQuery = isGameOverQuery;
         _logPlacementDiagnostic = logPlacementDiagnostic;
     }
@@ -89,6 +92,27 @@ public sealed class TowerPlacementSupportCoordinator
     /// </summary>
     public bool ValidatePlacementPosition(Vector3 worldPosition, TowerType towerType, out string invalidReason)
     {
+        TowerPowerGridCoordinator powerGridCoordinator = _powerGridCoordinatorQuery != null ? _powerGridCoordinatorQuery() : null;
+        if (towerType == TowerType.Relay && powerGridCoordinator != null && !powerGridCoordinator.CanPlaceRelay(out invalidReason))
+        {
+            return false;
+        }
+
+        if (towerType == TowerType.Defense)
+        {
+            if (powerGridCoordinator == null)
+            {
+                invalidReason = "Power grid is not initialized.";
+                return false;
+            }
+
+            if (!powerGridCoordinator.IsWithinAnyRelayCoverage(worldPosition))
+            {
+                invalidReason = "Defense towers must be placed inside relay coverage.";
+                return false;
+            }
+        }
+
         TowerPlacementRules placementRules = _placementRulesQuery != null ? _placementRulesQuery() : null;
         if (placementRules == null)
         {
@@ -168,8 +192,30 @@ public sealed class TowerPlacementSupportCoordinator
     /// </summary>
     public Bounds GetPlacementOverlayWorldBounds(TowerType towerType)
     {
-        TowerPlacementRules placementRules = _placementRulesQuery != null ? _placementRulesQuery() : null;
-        return placementRules != null ? placementRules.GetPlacementOverlayWorldBounds(towerType) : new Bounds(Vector3.zero, Vector3.zero);
+        BuildZone buildZone = _buildZoneQuery != null ? _buildZoneQuery() : null;
+        if (buildZone == null)
+        {
+            return new Bounds(Vector3.zero, Vector3.zero);
+        }
+
+        if (towerType == TowerType.Relay)
+        {
+            return buildZone.WorldBounds;
+        }
+
+        TowerPowerGridCoordinator powerGridCoordinator = _powerGridCoordinatorQuery != null ? _powerGridCoordinatorQuery() : null;
+        if (powerGridCoordinator == null)
+        {
+            return new Bounds(Vector3.zero, Vector3.zero);
+        }
+
+        Bounds relayCoverageBounds = powerGridCoordinator.GetRelayCoverageBounds();
+        if (relayCoverageBounds.size == Vector3.zero)
+        {
+            return new Bounds(Vector3.zero, Vector3.zero);
+        }
+
+        return TowerPlacementRules.IntersectBounds(buildZone.WorldBounds, relayCoverageBounds);
     }
 
     /// <summary>
@@ -232,14 +278,7 @@ public sealed class TowerPlacementSupportCoordinator
     /// </summary>
     public bool ShouldShowStarterZoneMarker()
     {
-        TowerPlacementRules placementRules = _placementRulesQuery != null ? _placementRulesQuery() : null;
-        if (placementRules != null)
-        {
-            return placementRules.ShouldShowStarterZoneMarker();
-        }
-
-        Transform placedTowerRoot = _placedTowerRootQuery != null ? _placedTowerRootQuery() : null;
-        return placedTowerRoot == null || placedTowerRoot.childCount == 0;
+        return false;
     }
 
     /// <summary>
@@ -286,11 +325,12 @@ public sealed class TowerPlacementSupportCoordinator
             return;
         }
 
-        Vector3 starterWorldPosition = new Vector3(_initialPlacementSquareCenter.x, _initialPlacementSquareCenter.y, 0f);
-        bool relayValid = ValidatePlacementPosition(starterWorldPosition, TowerType.Relay, out string relayReason);
-        bool defenseValid = ValidatePlacementPosition(starterWorldPosition, TowerType.Defense, out string defenseReason);
+        BuildZone buildZone = _buildZoneQuery != null ? _buildZoneQuery() : null;
+        Vector3 samplePosition = buildZone != null ? buildZone.WorldBounds.center : new Vector3(_initialPlacementSquareCenter.x, _initialPlacementSquareCenter.y, 0f);
+        bool relayValid = ValidatePlacementPosition(samplePosition, TowerType.Relay, out string relayReason);
+        bool defenseValid = ValidatePlacementPosition(samplePosition, TowerType.Defense, out string defenseReason);
 
         _logPlacementDiagnostic?.Invoke(
-            $"Starter sanity check: center={starterWorldPosition} relayValid={relayValid} relayReason={relayReason} defenseValid={defenseValid} defenseReason={defenseReason}");
+            $"Phase-two placement sanity check: sample={samplePosition} relayValid={relayValid} relayReason={relayReason} defenseValid={defenseValid} defenseReason={defenseReason}");
     }
 }

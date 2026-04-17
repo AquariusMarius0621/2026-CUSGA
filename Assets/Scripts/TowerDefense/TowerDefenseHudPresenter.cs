@@ -27,7 +27,8 @@ public readonly struct TowerDefenseHudState
         int totalWaves,
         TowerType selectedTowerType,
         bool isPlacementDragActive,
-        TowerType dragTowerType)
+        TowerType dragTowerType,
+        PlacedStructureHudState placedStructureState)
     {
         CurrentEnergy = currentEnergy;
         CurrentBaseHealth = currentBaseHealth;
@@ -36,6 +37,7 @@ public readonly struct TowerDefenseHudState
         SelectedTowerType = selectedTowerType;
         IsPlacementDragActive = isPlacementDragActive;
         DragTowerType = dragTowerType;
+        PlacedStructureState = placedStructureState;
     }
 
     public int CurrentEnergy { get; }
@@ -51,6 +53,22 @@ public readonly struct TowerDefenseHudState
     public bool IsPlacementDragActive { get; }
 
     public TowerType DragTowerType { get; }
+
+    public PlacedStructureHudState PlacedStructureState { get; }
+}
+
+public readonly struct PlacedStructureHudState
+{
+    public PlacedStructureHudState(bool hasSelection, string title, string details)
+    {
+        HasSelection = hasSelection;
+        Title = title ?? string.Empty;
+        Details = details ?? string.Empty;
+    }
+
+    public bool HasSelection { get; }
+    public string Title { get; }
+    public string Details { get; }
 }
 
 /// <summary>
@@ -460,6 +478,14 @@ public sealed class TowerDefenseHudPresenter
                     $"<size=30>{selectedDefinition.DisplayName}</size>\n" +
                     "<size=20><color=#8AA7BF>Drag the card to scan exact legal sectors</color></size>";
             }
+        }
+
+        if (state.PlacedStructureState.HasSelection)
+        {
+            return
+                "STRUCTURE LINK\n" +
+                $"<size=30>{state.PlacedStructureState.Title}</size>\n" +
+                $"<size=18><color=#89A7BF>{state.PlacedStructureState.Details}</color></size>";
         }
 
         return

@@ -22,6 +22,8 @@ public sealed class TowerDefenseInputCoordinator
 {
     private readonly Func<bool> _isGameOverQuery;
     private readonly Func<bool> _tryQuickPlacementAtCurrentMouse;
+    private readonly Func<bool> _tryUpgradeSelectedStructure;
+    private readonly Func<bool> _tryDemolishSelectedStructure;
     private readonly Action _selectRelayTower;
     private readonly Action _selectDefenseTower;
     private readonly Action _clearSelection;
@@ -31,12 +33,16 @@ public sealed class TowerDefenseInputCoordinator
     public TowerDefenseInputCoordinator(
         Func<bool> isGameOverQuery,
         Func<bool> tryQuickPlacementAtCurrentMouse,
+        Func<bool> tryUpgradeSelectedStructure,
+        Func<bool> tryDemolishSelectedStructure,
         Action selectRelayTower,
         Action selectDefenseTower,
         Action clearSelection)
     {
         _isGameOverQuery = isGameOverQuery;
         _tryQuickPlacementAtCurrentMouse = tryQuickPlacementAtCurrentMouse;
+        _tryUpgradeSelectedStructure = tryUpgradeSelectedStructure;
+        _tryDemolishSelectedStructure = tryDemolishSelectedStructure;
         _selectRelayTower = selectRelayTower;
         _selectDefenseTower = selectDefenseTower;
         _clearSelection = clearSelection;
@@ -141,6 +147,16 @@ public sealed class TowerDefenseInputCoordinator
         if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
         {
             _clearSelection?.Invoke();
+        }
+
+        if (Input.GetKeyDown(KeyCode.U))
+        {
+            _tryUpgradeSelectedStructure?.Invoke();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Delete) || Input.GetKeyDown(KeyCode.Backspace))
+        {
+            _tryDemolishSelectedStructure?.Invoke();
         }
     }
 
