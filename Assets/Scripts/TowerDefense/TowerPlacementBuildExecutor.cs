@@ -146,6 +146,12 @@ public sealed class TowerPlacementBuildExecutor
             : $"{towerDisplayName}_{placedTowerRoot.childCount:00}";
         tower.SetActive(true);
 
+        DefenseTower defenseTower = tower.GetComponent<DefenseTower>();
+        if (defenseTower != null && TowerTypeUtility.IsCombatTower(towerType))
+        {
+            defenseTower.ConfigureBuildType(towerType);
+        }
+
         EnsureTowerPlacementCollider(tower, towerType);
 
         if (ownerPad != null)

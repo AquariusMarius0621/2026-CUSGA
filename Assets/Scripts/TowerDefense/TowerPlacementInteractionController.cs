@@ -125,7 +125,22 @@ public sealed class TowerPlacementInteractionController
 
     public void SelectDefenseTower()
     {
-        SelectTower(TowerType.Defense);
+        SelectTower(TowerType.SingleTarget);
+    }
+
+    public void SelectSingleTargetTower()
+    {
+        SelectTower(TowerType.SingleTarget);
+    }
+
+    public void SelectSlowFieldTower()
+    {
+        SelectTower(TowerType.SlowField);
+    }
+
+    public void SelectBombardTower()
+    {
+        SelectTower(TowerType.Bombard);
     }
 
     /// <summary>

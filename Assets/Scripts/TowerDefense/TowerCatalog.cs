@@ -29,6 +29,8 @@ public sealed class TowerDefinition
         float placementRadius,
         float expansionSquareSize,
         string cardRoleSummary,
+        string selectionHint,
+        string upgradeFocusSummary,
         Color accentColor)
     {
         TowerType = towerType;
@@ -37,6 +39,8 @@ public sealed class TowerDefinition
         PlacementRadius = placementRadius;
         ExpansionSquareSize = expansionSquareSize;
         CardRoleSummary = cardRoleSummary;
+        SelectionHint = selectionHint;
+        UpgradeFocusSummary = upgradeFocusSummary;
         AccentColor = accentColor;
     }
 
@@ -81,6 +85,18 @@ public sealed class TowerDefinition
     public string CardRoleSummary { get; }
 
     /// <summary>
+    /// 选中某种塔卡时显示在操作区的即时提示文案。
+    /// 这行更偏“这座塔现在最适合干什么”。
+    /// </summary>
+    public string SelectionHint { get; }
+
+    /// <summary>
+    /// 用于说明升级后主要会往哪个方向成长。
+    /// 这能帮助玩家在升级前就理解不同塔的投资价值差异。
+    /// </summary>
+    public string UpgradeFocusSummary { get; }
+
+    /// <summary>
     /// 这类塔在 HUD / 部署卡里使用的强调色。
     /// </summary>
     public Color AccentColor { get; }
@@ -118,12 +134,20 @@ public sealed class TowerDefinition
 public sealed class TowerCatalog
 {
     private readonly TowerDefinition _relayDefinition;
-    private readonly TowerDefinition _defenseDefinition;
+    private readonly TowerDefinition _singleTargetDefinition;
+    private readonly TowerDefinition _slowFieldDefinition;
+    private readonly TowerDefinition _bombardDefinition;
 
-    public TowerCatalog(TowerDefinition relayDefinition, TowerDefinition defenseDefinition)
+    public TowerCatalog(
+        TowerDefinition relayDefinition,
+        TowerDefinition singleTargetDefinition,
+        TowerDefinition slowFieldDefinition,
+        TowerDefinition bombardDefinition)
     {
         _relayDefinition = relayDefinition;
-        _defenseDefinition = defenseDefinition;
+        _singleTargetDefinition = singleTargetDefinition;
+        _slowFieldDefinition = slowFieldDefinition;
+        _bombardDefinition = bombardDefinition;
     }
 
     /// <summary>
@@ -139,8 +163,14 @@ public sealed class TowerCatalog
             case TowerType.Relay:
                 definition = _relayDefinition;
                 return true;
-            case TowerType.Defense:
-                definition = _defenseDefinition;
+            case TowerType.SingleTarget:
+                definition = _singleTargetDefinition;
+                return true;
+            case TowerType.SlowField:
+                definition = _slowFieldDefinition;
+                return true;
+            case TowerType.Bombard:
+                definition = _bombardDefinition;
                 return true;
             default:
                 definition = null;

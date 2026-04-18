@@ -93,12 +93,12 @@ public sealed class TowerPlacementSupportCoordinator
     public bool ValidatePlacementPosition(Vector3 worldPosition, TowerType towerType, out string invalidReason)
     {
         TowerPowerGridCoordinator powerGridCoordinator = _powerGridCoordinatorQuery != null ? _powerGridCoordinatorQuery() : null;
-        if (towerType == TowerType.Relay && powerGridCoordinator != null && !powerGridCoordinator.CanPlaceRelay(out invalidReason))
+        if (TowerTypeUtility.IsRelay(towerType) && powerGridCoordinator != null && !powerGridCoordinator.CanPlaceRelay(out invalidReason))
         {
             return false;
         }
 
-        if (towerType == TowerType.Defense)
+        if (TowerTypeUtility.IsCombatTower(towerType))
         {
             if (powerGridCoordinator == null)
             {
@@ -179,7 +179,9 @@ public sealed class TowerPlacementSupportCoordinator
         {
             case TowerType.Relay:
                 return _relayTowerPrototypeQuery != null ? _relayTowerPrototypeQuery() : null;
-            case TowerType.Defense:
+            case TowerType.SingleTarget:
+            case TowerType.SlowField:
+            case TowerType.Bombard:
                 return _defenseTowerPrototypeQuery != null ? _defenseTowerPrototypeQuery() : null;
             default:
                 return null;
@@ -198,7 +200,7 @@ public sealed class TowerPlacementSupportCoordinator
             return new Bounds(Vector3.zero, Vector3.zero);
         }
 
-        if (towerType == TowerType.Relay)
+        if (TowerTypeUtility.IsRelay(towerType))
         {
             return buildZone.WorldBounds;
         }
@@ -328,7 +330,7 @@ public sealed class TowerPlacementSupportCoordinator
         BuildZone buildZone = _buildZoneQuery != null ? _buildZoneQuery() : null;
         Vector3 samplePosition = buildZone != null ? buildZone.WorldBounds.center : new Vector3(_initialPlacementSquareCenter.x, _initialPlacementSquareCenter.y, 0f);
         bool relayValid = ValidatePlacementPosition(samplePosition, TowerType.Relay, out string relayReason);
-        bool defenseValid = ValidatePlacementPosition(samplePosition, TowerType.Defense, out string defenseReason);
+        bool defenseValid = ValidatePlacementPosition(samplePosition, TowerType.SingleTarget, out string defenseReason);
 
         _logPlacementDiagnostic?.Invoke(
             $"Phase-two placement sanity check: sample={samplePosition} relayValid={relayValid} relayReason={relayReason} defenseValid={defenseValid} defenseReason={defenseReason}");

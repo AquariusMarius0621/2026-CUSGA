@@ -18,6 +18,8 @@ public readonly struct TowerDefenseHudSceneReferences
         TMP_Text selectionText,
         Button relayTowerButton,
         Button defenseTowerButton,
+        Button slowFieldTowerButton,
+        Button bombardTowerButton,
         Button clearSelectionButton,
         GameObject gameOverPanel,
         TMP_Text gameOverTitle,
@@ -31,6 +33,8 @@ public readonly struct TowerDefenseHudSceneReferences
         SelectionText = selectionText;
         RelayTowerButton = relayTowerButton;
         DefenseTowerButton = defenseTowerButton;
+        SlowFieldTowerButton = slowFieldTowerButton;
+        BombardTowerButton = bombardTowerButton;
         ClearSelectionButton = clearSelectionButton;
         GameOverPanel = gameOverPanel;
         GameOverTitle = gameOverTitle;
@@ -45,6 +49,8 @@ public readonly struct TowerDefenseHudSceneReferences
     public TMP_Text SelectionText { get; }
     public Button RelayTowerButton { get; }
     public Button DefenseTowerButton { get; }
+    public Button SlowFieldTowerButton { get; }
+    public Button BombardTowerButton { get; }
     public Button ClearSelectionButton { get; }
     public GameObject GameOverPanel { get; }
     public TMP_Text GameOverTitle { get; }
@@ -121,6 +127,8 @@ public sealed class TowerDefenseSceneBootstrapper
             selectionText: hudSceneReferences.SelectionText,
             relayTowerButton: hudSceneReferences.RelayTowerButton,
             defenseTowerButton: hudSceneReferences.DefenseTowerButton,
+            slowFieldTowerButton: hudSceneReferences.SlowFieldTowerButton,
+            bombardTowerButton: hudSceneReferences.BombardTowerButton,
             clearSelectionButton: hudSceneReferences.ClearSelectionButton,
             gameOverPanel: hudSceneReferences.GameOverPanel,
             gameOverTitle: hudSceneReferences.GameOverTitle,

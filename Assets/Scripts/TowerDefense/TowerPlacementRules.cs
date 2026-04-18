@@ -273,9 +273,10 @@ public sealed class TowerPlacementRules
             return true;
         }
 
-        if (placedTower.GetComponent<DefenseTower>() != null)
+        DefenseTower defenseTower = placedTower.GetComponent<DefenseTower>();
+        if (defenseTower != null)
         {
-            towerType = TowerType.Defense;
+            towerType = defenseTower.BuildType;
             return true;
         }
 

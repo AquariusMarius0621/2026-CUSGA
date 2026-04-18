@@ -119,11 +119,15 @@ public sealed class TowerDefenseHudPresenter
     private TMP_Text _gameOverHint;
     private TMP_Text _relayTowerButtonText;
     private TMP_Text _defenseTowerButtonText;
+    private TMP_Text _slowFieldTowerButtonText;
+    private TMP_Text _bombardTowerButtonText;
     private TMP_Text _clearSelectionButtonText;
     private TMP_Text _dragPreviewLabel;
 
     private Button _relayTowerButton;
     private Button _defenseTowerButton;
+    private Button _slowFieldTowerButton;
+    private Button _bombardTowerButton;
     private Button _clearSelectionButton;
     private GameObject _gameOverPanel;
     private GameObject _dragPreviewPanel;
@@ -146,6 +150,8 @@ public sealed class TowerDefenseHudPresenter
         TMP_Text selectionText,
         Button relayTowerButton,
         Button defenseTowerButton,
+        Button slowFieldTowerButton,
+        Button bombardTowerButton,
         Button clearSelectionButton,
         GameObject gameOverPanel,
         TMP_Text gameOverTitle,
@@ -159,6 +165,8 @@ public sealed class TowerDefenseHudPresenter
         _selectionText = selectionText;
         _relayTowerButton = relayTowerButton;
         _defenseTowerButton = defenseTowerButton;
+        _slowFieldTowerButton = slowFieldTowerButton;
+        _bombardTowerButton = bombardTowerButton;
         _clearSelectionButton = clearSelectionButton;
         _gameOverPanel = gameOverPanel;
         _gameOverTitle = gameOverTitle;
@@ -170,6 +178,8 @@ public sealed class TowerDefenseHudPresenter
 
         _relayTowerButtonText = _relayTowerButton != null ? _relayTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
         _defenseTowerButtonText = _defenseTowerButton != null ? _defenseTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
+        _slowFieldTowerButtonText = _slowFieldTowerButton != null ? _slowFieldTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
+        _bombardTowerButtonText = _bombardTowerButton != null ? _bombardTowerButton.GetComponentInChildren<TMP_Text>(true) : null;
         _clearSelectionButtonText = _clearSelectionButton != null ? _clearSelectionButton.GetComponentInChildren<TMP_Text>(true) : null;
     }
 
@@ -194,6 +204,16 @@ public sealed class TowerDefenseHudPresenter
             _defenseTowerButtonText = _defenseTowerButton.GetComponentInChildren<TMP_Text>(true);
         }
 
+        if (_slowFieldTowerButtonText == null && _slowFieldTowerButton != null)
+        {
+            _slowFieldTowerButtonText = _slowFieldTowerButton.GetComponentInChildren<TMP_Text>(true);
+        }
+
+        if (_bombardTowerButtonText == null && _bombardTowerButton != null)
+        {
+            _bombardTowerButtonText = _bombardTowerButton.GetComponentInChildren<TMP_Text>(true);
+        }
+
         if (_clearSelectionButtonText == null && _clearSelectionButton != null)
         {
             _clearSelectionButtonText = _clearSelectionButton.GetComponentInChildren<TMP_Text>(true);
@@ -207,6 +227,8 @@ public sealed class TowerDefenseHudPresenter
         WarnIfMissing(_selectionText, "SelectionText");
         WarnIfMissing(_relayTowerButton, "RelayTowerButton");
         WarnIfMissing(_defenseTowerButton, "DefenseTowerButton");
+        WarnIfMissing(_slowFieldTowerButton, "SlowFieldTowerButton");
+        WarnIfMissing(_bombardTowerButton, "BombardTowerButton");
         WarnIfMissing(_clearSelectionButton, "ClearSelectionButton");
         WarnIfMissing(_gameOverPanel, "GameOverPanel");
         WarnIfMissing(_gameOverTitle, "GameOverTitle");
@@ -278,7 +300,9 @@ public sealed class TowerDefenseHudPresenter
     public void ConfigureCardLabels(TowerCatalog towerCatalog)
     {
         ConfigureTowerCardLabel(_relayTowerButtonText, towerCatalog.GetDefinition(TowerType.Relay));
-        ConfigureTowerCardLabel(_defenseTowerButtonText, towerCatalog.GetDefinition(TowerType.Defense));
+        ConfigureTowerCardLabel(_defenseTowerButtonText, towerCatalog.GetDefinition(TowerType.SingleTarget));
+        ConfigureTowerCardLabel(_slowFieldTowerButtonText, towerCatalog.GetDefinition(TowerType.SlowField));
+        ConfigureTowerCardLabel(_bombardTowerButtonText, towerCatalog.GetDefinition(TowerType.Bombard));
 
         if (_clearSelectionButtonText != null)
         {
@@ -473,10 +497,12 @@ public sealed class TowerDefenseHudPresenter
             TowerDefinition selectedDefinition = towerCatalog.GetDefinition(state.SelectedTowerType);
             if (selectedDefinition != null)
             {
+                string accentHex = ColorUtility.ToHtmlStringRGB(selectedDefinition.AccentColor);
                 return
                     "TACTICAL READY\n" +
                     $"<size=30>{selectedDefinition.DisplayName}</size>\n" +
-                    "<size=20><color=#8AA7BF>Drag the card to scan exact legal sectors</color></size>";
+                    $"<size=20><color=#{accentHex}>{selectedDefinition.SelectionHint}</color></size>\n" +
+                    $"<size=18><color=#8AA7BF>{selectedDefinition.UpgradeFocusSummary}</color></size>";
             }
         }
 
@@ -490,8 +516,8 @@ public sealed class TowerDefenseHudPresenter
 
         return
             "OPERATION LINK\n" +
-            "<size=28>Drag a tower card to project legal sectors</size>\n" +
-            "<size=20><color=#89A7BF>1 Relay / 2 Defense / Esc Cancel</color></size>";
+            "<size=28>Click or drag a tower card to project legal sectors</size>\n" +
+            "<size=20><color=#89A7BF>1 Relay / 2 Single / 3 Slow / 4 Bomb / Esc Cancel</color></size>";
     }
 
     /// <summary>
@@ -513,7 +539,17 @@ public sealed class TowerDefenseHudPresenter
 
         if (_defenseTowerButton != null)
         {
-            _defenseTowerButton.interactable = canAffordTower(TowerType.Defense);
+            _defenseTowerButton.interactable = canAffordTower(TowerType.SingleTarget);
+        }
+
+        if (_slowFieldTowerButton != null)
+        {
+            _slowFieldTowerButton.interactable = canAffordTower(TowerType.SlowField);
+        }
+
+        if (_bombardTowerButton != null)
+        {
+            _bombardTowerButton.interactable = canAffordTower(TowerType.Bombard);
         }
 
         if (_clearSelectionButton != null)

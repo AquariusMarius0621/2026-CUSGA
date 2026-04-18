@@ -13,7 +13,9 @@ public enum TowerType
 {
     None,
     Relay,
-    Defense
+    SingleTarget,
+    SlowField,
+    Bombard
 }
 
 /// <summary>
@@ -33,7 +35,9 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private int startingEnergy = 80;
     [SerializeField] private int startingBaseHealth = 10;
     [SerializeField] private int relayTowerCost = 0;
-    [SerializeField] private int defenseTowerCost = 45;
+    [SerializeField] private int singleTargetTowerCost = 45;
+    [SerializeField] private int slowFieldTowerCost = 55;
+    [SerializeField] private int bombardTowerCost = 65;
 
     [Header("Placement Rules")]
     [SerializeField] private float relayPlacementRadius = 0.52f;
@@ -94,6 +98,8 @@ public class TowerDefenseGame : MonoBehaviour
 
     [SerializeField] private Button relayTowerButtonReference;
     [SerializeField] private Button defenseTowerButtonReference;
+    [SerializeField] private Button slowFieldTowerButtonReference;
+    [SerializeField] private Button bombardTowerButtonReference;
     [SerializeField] private Button clearSelectionButtonReference;
     [SerializeField] private GameObject gameOverPanelReference;
     [SerializeField] private TMP_Text gameOverTitleReference;
@@ -229,7 +235,7 @@ public class TowerDefenseGame : MonoBehaviour
         EnsureRuntimeRoots();
         _placementSupportCoordinator?.RefreshPlacementRuleContext();
         InitializePlacementVisuals();
-        _presentationCoordinator?.InitializePresentation("Place a relay on any empty ground, then deploy turrets inside relay coverage. Hotkeys: 1 / 2.");
+        _presentationCoordinator?.InitializePresentation("Place a relay on any empty ground, then deploy towers inside relay coverage. You can drag the deploy cards or use hotkeys 1 / 2 / 3 / 4.");
         _placementSupportCoordinator?.HidePlacementAreaOverlay();
         _placementSupportCoordinator?.RunStarterPlacementSanityCheck();
         _powerGridCoordinator?.RecalculatePowerDistribution();
@@ -368,7 +374,19 @@ public class TowerDefenseGame : MonoBehaviour
     public void SelectDefenseTower()
     {
         ClearPlacedStructureSelection();
-        _placementInteractionController?.SelectDefenseTower();
+        _placementInteractionController?.SelectSingleTargetTower();
+    }
+
+    public void SelectSlowFieldTower()
+    {
+        ClearPlacedStructureSelection();
+        _placementInteractionController?.SelectSlowFieldTower();
+    }
+
+    public void SelectBombardTower()
+    {
+        ClearPlacedStructureSelection();
+        _placementInteractionController?.SelectBombardTower();
     }
 
     /// <summary>
@@ -419,7 +437,8 @@ public class TowerDefenseGame : MonoBehaviour
 
             _sessionState.SetCurrentEnergy(_sessionState.CurrentEnergy - upgradeCost);
             _powerGridCoordinator.ApplyRelayUpgrade(_selectedRelayTower);
-            SetStatusMessage($"Relay #{_selectedRelayTower.RelayNumber} upgraded to LV {_selectedRelayTower.CurrentLevel}.");
+            SetStatusMessage(
+                $"Relay #{_selectedRelayTower.RelayNumber} upgraded to LV {_selectedRelayTower.CurrentLevel}. Capacity is now {_selectedRelayTower.SupplyCapacity}.");
             InvalidatePlacementAreaOverlayCache();
             RefreshHud();
             return true;
@@ -440,7 +459,8 @@ public class TowerDefenseGame : MonoBehaviour
 
             _sessionState.SetCurrentEnergy(_sessionState.CurrentEnergy - upgradeCost);
             _powerGridCoordinator.ApplyDefenseTowerUpgrade(_selectedDefenseTower);
-            SetStatusMessage($"Defense tower #{_selectedDefenseTower.TowerNumber} upgraded to LV {_selectedDefenseTower.CurrentLevel}.");
+            SetStatusMessage(
+                $"{GetTowerDisplayName(_selectedDefenseTower.BuildType)} #{_selectedDefenseTower.TowerNumber} upgraded to LV {_selectedDefenseTower.CurrentLevel}. Power demand is now {_selectedDefenseTower.PowerRequired}.");
             RefreshHud();
             return true;
         }
@@ -473,7 +493,7 @@ public class TowerDefenseGame : MonoBehaviour
             ClearPlacedStructureSelection();
             Destroy(defenseTower.gameObject);
             InvalidatePlacementAreaOverlayCache();
-            SetStatusMessage($"Defense tower #{defenseTower.TowerNumber} dismantled.");
+            SetStatusMessage($"{GetTowerDisplayName(defenseTower.BuildType)} #{defenseTower.TowerNumber} dismantled.");
             RefreshHud();
             return true;
         }
@@ -522,15 +542,39 @@ public class TowerDefenseGame : MonoBehaviour
                 placementRadius: relayPlacementRadius,
                 expansionSquareSize: relayExpansionSquareSize,
                 cardRoleSummary: "Relay Node / Supply Grid",
+                selectionHint: "Anchor the power grid first, then expand tower coverage from there.",
+                upgradeFocusSummary: "Upgrades add more supply capacity without changing relay coverage radius.",
                 accentColor: new Color(1f, 0.55f, 0.22f, 1f)),
-            defenseDefinition: new TowerDefinition(
-                towerType: TowerType.Defense,
+            singleTargetDefinition: new TowerDefinition(
+                towerType: TowerType.SingleTarget,
                 displayName: "Defense Turret",
-                buildCost: defenseTowerCost,
+                buildCost: singleTargetTowerCost,
                 placementRadius: defensePlacementRadius,
                 expansionSquareSize: defenseExpansionSquareSize,
-                cardRoleSummary: "Frontline Damage",
-                accentColor: new Color(0.28f, 0.78f, 1f, 1f)));
+                cardRoleSummary: "Focus Fire / Frontline",
+                selectionHint: "Reliable direct damage for finishing one target at a time.",
+                upgradeFocusSummary: "Upgrades push faster fire, longer reach, and steadier single-target DPS.",
+                accentColor: new Color(0.28f, 0.78f, 1f, 1f)),
+            slowFieldDefinition: new TowerDefinition(
+                towerType: TowerType.SlowField,
+                displayName: "Slow Field Tower",
+                buildCost: slowFieldTowerCost,
+                placementRadius: defensePlacementRadius,
+                expansionSquareSize: defenseExpansionSquareSize,
+                cardRoleSummary: "Area Control / Slow",
+                selectionHint: "Controls lanes by slowing every enemy inside the field.",
+                upgradeFocusSummary: "Upgrades strengthen the slow, extend control time, and improve area denial.",
+                accentColor: new Color(0.36f, 0.95f, 0.84f, 1f)),
+            bombardDefinition: new TowerDefinition(
+                towerType: TowerType.Bombard,
+                displayName: "Bombard Tower",
+                buildCost: bombardTowerCost,
+                placementRadius: defensePlacementRadius,
+                expansionSquareSize: defenseExpansionSquareSize,
+                cardRoleSummary: "Burst Splash / Delayed",
+                selectionHint: "Delayed splash damage that punishes clustered enemies at range.",
+                upgradeFocusSummary: "Upgrades widen the blast, shorten bomb travel, and raise burst damage.",
+                accentColor: new Color(1f, 0.62f, 0.26f, 1f)));
 
         _placementRules = new TowerPlacementRules(
             towerType => _placementSupportCoordinator != null ? _placementSupportCoordinator.GetPlacementRadius(towerType) : 0.5f,
@@ -561,7 +605,9 @@ public class TowerDefenseGame : MonoBehaviour
             tryUpgradeSelectedStructure: TryUpgradeSelectedStructure,
             tryDemolishSelectedStructure: TryDemolishSelectedStructure,
             selectRelayTower: SelectRelayTower,
-            selectDefenseTower: SelectDefenseTower,
+            selectSingleTargetTower: SelectDefenseTower,
+            selectSlowFieldTower: SelectSlowFieldTower,
+            selectBombardTower: SelectBombardTower,
             clearSelection: ClearSelection);
         _hudPresenter = new TowerDefenseHudPresenter();
         _placementInteractionController = new TowerPlacementInteractionController(
@@ -685,6 +731,7 @@ public class TowerDefenseGame : MonoBehaviour
                               _sessionState != null &&
                               _powerGridCoordinator.CanUpgradeRelay(_selectedRelayTower, _sessionState.CurrentEnergy, out upgradeCost, out invalidReason);
             string detail = $"Relay #{_selectedRelayTower.RelayNumber} / LV {_selectedRelayTower.CurrentLevel} / Load {_selectedRelayTower.CurrentAssignedLoad}/{_selectedRelayTower.SupplyCapacity}";
+            detail += $"\nRange {_selectedRelayTower.SupplyRange:0.0} / Next cap {_selectedRelayTower.PreviewUpgradedSupplyCapacity()}";
             detail += canUpgrade
                 ? $"\nU Upgrade ({upgradeCost} EN) / Delete Dismantle"
                 : $"\n{invalidReason}";
@@ -697,16 +744,17 @@ public class TowerDefenseGame : MonoBehaviour
             string invalidReason = string.Empty;
             string powerState = _selectedDefenseTower.IsPowered
                 ? $"ONLINE / Relay #{(_selectedDefenseTower.AssignedRelay != null ? _selectedDefenseTower.AssignedRelay.RelayNumber : 0)}"
-                : "OFFLINE / No stable supply";
+                : _selectedDefenseTower.PowerStatusMessage;
             bool canUpgrade = _powerGridCoordinator != null &&
                               _sessionState != null &&
                               _powerGridCoordinator.CanUpgradeDefenseTower(_selectedDefenseTower, _sessionState.CurrentEnergy, out upgradeCost, out invalidReason);
             string detail = $"Turret #{_selectedDefenseTower.TowerNumber} / LV {_selectedDefenseTower.CurrentLevel} / {powerState}";
-            detail += $"\nPower { _selectedDefenseTower.PowerRequired } / Damage { _selectedDefenseTower.DamagePerShot }";
+            detail += $"\n{_selectedDefenseTower.BuildCurrentCombatSummary()}";
+            detail += $"\n{_selectedDefenseTower.BuildUpgradePreviewSummary()}";
             detail += canUpgrade
                 ? $"\nU Upgrade ({upgradeCost} EN) / Delete Dismantle"
                 : $"\n{invalidReason}";
-            return new PlacedStructureHudState(true, "Defense Tower", detail);
+            return new PlacedStructureHudState(true, GetTowerDisplayName(_selectedDefenseTower.BuildType), detail);
         }
 
         return new PlacedStructureHudState(false, string.Empty, string.Empty);
@@ -738,7 +786,7 @@ public class TowerDefenseGame : MonoBehaviour
         _placementInteractionController?.SetSelectionSilently(TowerType.None);
         _selectedDefenseTower = defenseTower;
         _selectedRelayTower = null;
-        SetStatusMessage($"Selected defense tower #{defenseTower.TowerNumber}. Press U to upgrade or Delete to dismantle.");
+        SetStatusMessage($"Selected {GetTowerDisplayName(defenseTower.BuildType)} #{defenseTower.TowerNumber}. Press U to upgrade or Delete to dismantle.");
         RefreshHud();
     }
 
@@ -1015,6 +1063,8 @@ public class TowerDefenseGame : MonoBehaviour
                 selectionTextReference,
                 relayTowerButtonReference,
                 defenseTowerButtonReference,
+                slowFieldTowerButtonReference,
+                bombardTowerButtonReference,
                 clearSelectionButtonReference,
                 gameOverPanelReference,
                 gameOverTitleReference,

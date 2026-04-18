@@ -194,8 +194,14 @@ public class TowerShopCard : MonoBehaviour,
             case TowerType.Relay:
                 TowerDefenseGame.Instance.SelectRelayTower();
                 break;
-            case TowerType.Defense:
+            case TowerType.SingleTarget:
                 TowerDefenseGame.Instance.SelectDefenseTower();
+                break;
+            case TowerType.SlowField:
+                TowerDefenseGame.Instance.SelectSlowFieldTower();
+                break;
+            case TowerType.Bombard:
+                TowerDefenseGame.Instance.SelectBombardTower();
                 break;
         }
     }

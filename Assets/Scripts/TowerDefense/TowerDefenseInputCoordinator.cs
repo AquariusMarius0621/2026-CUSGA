@@ -25,7 +25,9 @@ public sealed class TowerDefenseInputCoordinator
     private readonly Func<bool> _tryUpgradeSelectedStructure;
     private readonly Func<bool> _tryDemolishSelectedStructure;
     private readonly Action _selectRelayTower;
-    private readonly Action _selectDefenseTower;
+    private readonly Action _selectSingleTargetTower;
+    private readonly Action _selectSlowFieldTower;
+    private readonly Action _selectBombardTower;
     private readonly Action _clearSelection;
 
     private Camera _mainCamera;
@@ -36,7 +38,9 @@ public sealed class TowerDefenseInputCoordinator
         Func<bool> tryUpgradeSelectedStructure,
         Func<bool> tryDemolishSelectedStructure,
         Action selectRelayTower,
-        Action selectDefenseTower,
+        Action selectSingleTargetTower,
+        Action selectSlowFieldTower,
+        Action selectBombardTower,
         Action clearSelection)
     {
         _isGameOverQuery = isGameOverQuery;
@@ -44,7 +48,9 @@ public sealed class TowerDefenseInputCoordinator
         _tryUpgradeSelectedStructure = tryUpgradeSelectedStructure;
         _tryDemolishSelectedStructure = tryDemolishSelectedStructure;
         _selectRelayTower = selectRelayTower;
-        _selectDefenseTower = selectDefenseTower;
+        _selectSingleTargetTower = selectSingleTargetTower;
+        _selectSlowFieldTower = selectSlowFieldTower;
+        _selectBombardTower = selectBombardTower;
         _clearSelection = clearSelection;
     }
 
@@ -141,7 +147,15 @@ public sealed class TowerDefenseInputCoordinator
         }
         else if (Input.GetKeyDown(KeyCode.Alpha2))
         {
-            _selectDefenseTower?.Invoke();
+            _selectSingleTargetTower?.Invoke();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            _selectSlowFieldTower?.Invoke();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha4))
+        {
+            _selectBombardTower?.Invoke();
         }
 
         if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))

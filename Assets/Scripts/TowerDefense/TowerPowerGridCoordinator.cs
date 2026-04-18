@@ -9,6 +9,16 @@ using UnityEngine;
 /// </summary>
 public sealed class TowerPowerGridCoordinator
 {
+    private sealed class TowerOfflineReason
+    {
+        public TowerOfflineReason(string message)
+        {
+            Message = message;
+        }
+
+        public string Message { get; }
+    }
+
     private sealed class RelayEvaluation
     {
         public RelayTower Relay { get; set; }
@@ -119,7 +129,9 @@ public sealed class TowerPowerGridCoordinator
                 break;
             }
 
-            case TowerType.Defense:
+            case TowerType.SingleTarget:
+            case TowerType.SlowField:
+            case TowerType.Bombard:
             {
                 DefenseTower defenseTower = structureObject.GetComponent<DefenseTower>();
                 if (defenseTower != null && defenseTower.TowerNumber >= 100 && _towerNumbers.Count > 0)
@@ -201,7 +213,14 @@ public sealed class TowerPowerGridCoordinator
         SimulationResult upgradedSimulation = Simulate(relays, towers, null, towerPowerOverrides);
         if (!upgradedSimulation.Assignments.ContainsKey(tower))
         {
-            invalidReason = "Upgrade would exceed the available relay capacity.";
+            Dictionary<DefenseTower, TowerOfflineReason> upgradeReasons = BuildOfflineReasons(
+                relays,
+                towers,
+                upgradedSimulation.Evaluations,
+                upgradedSimulation.Assignments);
+            invalidReason = upgradeReasons.TryGetValue(tower, out TowerOfflineReason reason)
+                ? $"Upgrade blocked: {reason.Message}"
+                : "Upgrade blocked: this tower would lose its power supply.";
             return false;
         }
 
@@ -209,7 +228,7 @@ public sealed class TowerPowerGridCoordinator
         {
             if (!upgradedSimulation.Assignments.ContainsKey(currentAssignment.Key))
             {
-                invalidReason = "Upgrade would force at least one currently powered tower offline.";
+                invalidReason = $"Upgrade blocked: tower #{currentAssignment.Key.TowerNumber} would be forced offline.";
                 return false;
             }
         }
@@ -250,7 +269,7 @@ public sealed class TowerPowerGridCoordinator
 
         for (int i = 0; i < towers.Count; i++)
         {
-            towers[i].SetPowerState(false, null);
+            towers[i].SetPowerState(false, null, "Awaiting power evaluation.");
         }
 
         if (relays.Count == 0 || towers.Count == 0)
@@ -262,7 +281,8 @@ public sealed class TowerPowerGridCoordinator
         towers.Sort((a, b) => a.TowerNumber.CompareTo(b.TowerNumber));
 
         SimulationResult simulation = Simulate(relays, towers, null, null);
-        ApplyAssignments(relays, towers, simulation.Assignments);
+        Dictionary<DefenseTower, TowerOfflineReason> offlineReasons = BuildOfflineReasons(relays, towers, simulation.Evaluations, simulation.Assignments);
+        ApplyAssignments(relays, towers, simulation.Assignments, offlineReasons);
     }
 
     private SimulationResult Simulate(
@@ -421,8 +441,11 @@ public sealed class TowerPowerGridCoordinator
     private void ApplyAssignments(
         List<RelayTower> relays,
         List<DefenseTower> towers,
-        Dictionary<DefenseTower, RelayTower> assignments)
+        Dictionary<DefenseTower, RelayTower> assignments,
+        Dictionary<DefenseTower, TowerOfflineReason> offlineReasons)
     {
+        HashSet<DefenseTower> poweredTowers = new HashSet<DefenseTower>();
+
         foreach (RelayTower relay in relays)
         {
             int remainingCapacity = relay.SupplyCapacity;
@@ -438,22 +461,85 @@ public sealed class TowerPowerGridCoordinator
                 DefenseTower tower = relayTowers[towerIndex];
                 if (tower.PowerRequired > remainingCapacity)
                 {
-                    tower.SetPowerState(false, null);
+                    tower.SetPowerState(false, null, $"Relay #{relay.RelayNumber} no longer has enough remaining capacity.");
                     continue;
                 }
 
                 remainingCapacity -= tower.PowerRequired;
                 assignedLoad += tower.PowerRequired;
-                tower.SetPowerState(true, relay);
+                poweredTowers.Add(tower);
+                tower.SetPowerState(true, relay, $"Powered by relay #{relay.RelayNumber}. Remaining relay capacity: {remainingCapacity}.");
             }
 
             relay.SetRuntimeLoad(assignedLoad);
+        }
+
+        for (int towerIndex = 0; towerIndex < towers.Count; towerIndex++)
+        {
+            DefenseTower tower = towers[towerIndex];
+            if (poweredTowers.Contains(tower))
+            {
+                continue;
+            }
+
+            string message = offlineReasons != null && offlineReasons.TryGetValue(tower, out TowerOfflineReason reason)
+                ? reason.Message
+                : "Tower is offline.";
+            tower.SetPowerState(false, null, message);
         }
 
         int poweredTowerCount = towers.Count(tower => tower.IsPowered);
         int unpoweredTowerCount = towers.Count - poweredTowerCount;
         _logDiagnostic?.Invoke(
             $"Power grid recalculated: relays={relays.Count} powered={poweredTowerCount} offline={unpoweredTowerCount} relayLimit={RelayLimit}");
+    }
+
+    private static Dictionary<DefenseTower, TowerOfflineReason> BuildOfflineReasons(
+        List<RelayTower> relays,
+        List<DefenseTower> towers,
+        Dictionary<RelayTower, RelayEvaluation> evaluations,
+        Dictionary<DefenseTower, RelayTower> assignments)
+    {
+        Dictionary<DefenseTower, TowerOfflineReason> reasons = new Dictionary<DefenseTower, TowerOfflineReason>();
+
+        for (int towerIndex = 0; towerIndex < towers.Count; towerIndex++)
+        {
+            DefenseTower tower = towers[towerIndex];
+            if (assignments.ContainsKey(tower))
+            {
+                continue;
+            }
+
+            List<RelayTower> coveringRelays = relays
+                .Where(relay => relay.ContainsPoint(tower.transform.position))
+                .OrderBy(relay => relay.RelayNumber)
+                .ToList();
+
+            if (coveringRelays.Count == 0)
+            {
+                reasons[tower] = new TowerOfflineReason("Offline: not inside any relay coverage.");
+                continue;
+            }
+
+            RelayTower lowestRelay = coveringRelays[0];
+            if (coveringRelays.Count == 1)
+            {
+                reasons[tower] = new TowerOfflineReason(
+                    $"Offline: relay #{lowestRelay.RelayNumber} ran out of capacity before this tower's turn.");
+                continue;
+            }
+
+            bool anyRelayHasWorkingTower = coveringRelays.Any(relay =>
+                evaluations.TryGetValue(relay, out RelayEvaluation evaluation) && evaluation.WorkingTowers.Count > 0);
+
+            reasons[tower] = anyRelayHasWorkingTower
+                ? new TowerOfflineReason(
+                    $"Offline: covered by multiple relays, but higher-priority towers consumed all available supply before this tower could be powered.")
+                : new TowerOfflineReason(
+                    $"Offline: covered by relays, but no relay can currently reserve enough capacity for this tower.");
+        }
+
+        return reasons;
     }
 
     private static int GetRelayCapacity(RelayTower relay, Dictionary<RelayTower, int> relayCapacityOverrides)
