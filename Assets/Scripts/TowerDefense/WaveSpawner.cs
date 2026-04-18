@@ -21,6 +21,7 @@ public sealed class WaveSpawner : MonoBehaviour
         public float spawnInterval;
         public float moveSpeed;
         public int enemyHealth;
+        public int enemyScrapReward;
     }
 
     [Header("Wave Timing")]
@@ -124,6 +125,10 @@ public sealed class WaveSpawner : MonoBehaviour
             {
                 TowerDefenseGame.Instance.SetStatusMessage($"Wave {_currentWaveIndex + 1} started.");
             }
+
+            TowerDefenseGame.Instance.ShowTransientHudNotice(
+                $"Wave {_currentWaveIndex + 1}: salvage potential {GetWaveScrapRewardTotal(wave)} SCRAP.",
+                duration: 3.4f);
         }
 
         if (!SpawnEnemy(wave, _currentWaveIndex + 1, _spawnedInCurrentWave + 1))
@@ -167,9 +172,9 @@ public sealed class WaveSpawner : MonoBehaviour
 
         waves = new[]
         {
-            new WaveDefinition { enemyCount = 4, spawnInterval = 1.0f, moveSpeed = 1.8f, enemyHealth = 3 },
-            new WaveDefinition { enemyCount = 6, spawnInterval = 0.85f, moveSpeed = 2.1f, enemyHealth = 4 },
-            new WaveDefinition { enemyCount = 8, spawnInterval = 0.70f, moveSpeed = 2.4f, enemyHealth = 6 }
+            new WaveDefinition { enemyCount = 4, spawnInterval = 1.0f, moveSpeed = 1.8f, enemyHealth = 3, enemyScrapReward = 8 },
+            new WaveDefinition { enemyCount = 6, spawnInterval = 0.85f, moveSpeed = 2.1f, enemyHealth = 4, enemyScrapReward = 11 },
+            new WaveDefinition { enemyCount = 8, spawnInterval = 0.70f, moveSpeed = 2.4f, enemyHealth = 6, enemyScrapReward = 15 }
         };
     }
 
@@ -191,7 +196,7 @@ public sealed class WaveSpawner : MonoBehaviour
         Enemy enemy = enemyObject.GetComponent<Enemy>();
         if (enemy != null)
         {
-            enemy.Initialize(spawnPath, wave.moveSpeed, wave.enemyHealth);
+            enemy.Initialize(spawnPath, wave.moveSpeed, wave.enemyHealth, wave.enemyScrapReward);
         }
 
         return true;
@@ -200,6 +205,11 @@ public sealed class WaveSpawner : MonoBehaviour
     private bool HasAnySpawnSource()
     {
         return (_battlefieldMap != null && _battlefieldMap.HasAnyValidSpawnGate()) || _fallbackEnemyPath != null;
+    }
+
+    private static int GetWaveScrapRewardTotal(WaveDefinition wave)
+    {
+        return Mathf.Max(0, wave.enemyCount) * Mathf.Max(0, wave.enemyScrapReward);
     }
 
     private EnemyPath ResolveSpawnPath(out EnemySpawnGate spawnGate)

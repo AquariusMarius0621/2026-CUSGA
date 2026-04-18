@@ -24,8 +24,8 @@ public partial class RelayTower
     [Header("Progression")]
     [SerializeField] private int currentLevel = 1;
     [SerializeField] private int maxLevel = 3;
-    [SerializeField] private int upgradeCostBase = 20;
-    [SerializeField] private int upgradeCostPerLevel = 10;
+    [SerializeField] private int upgradeCostBase = 16;
+    [SerializeField] private int upgradeCostPerLevel = 12;
 
     [Header("Visuals")]
     [SerializeField] private Color normalColor = new Color(1f, 0.85f, 0.2f, 1f);

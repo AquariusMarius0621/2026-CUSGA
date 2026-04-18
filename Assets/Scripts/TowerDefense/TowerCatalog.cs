@@ -102,6 +102,12 @@ public sealed class TowerDefinition
     public Color AccentColor { get; }
 
     /// <summary>
+    /// 统一格式化建造成本展示。
+    /// 继电器免费时直接写成 `FREE`，比显示 `0 SCRAP` 更像正式规则文案。
+    /// </summary>
+    public string BuildCostLabel => BuildCost > 0 ? $"{BuildCost} SCRAP" : "FREE";
+
+    /// <summary>
     /// 生成部署卡的多行富文本。
     ///
     /// 把这段格式化逻辑放在定义对象里，
@@ -114,7 +120,7 @@ public sealed class TowerDefinition
         return
             $"{DisplayName.ToUpperInvariant()}\n" +
             $"<size=20><color=#9FB4C8>{CardRoleSummary} / GRID {ExpansionSquareSize:0.0}</color></size>\n" +
-            $"<size=32><color=#{accentHex}>{BuildCost} EN</color></size>";
+            $"<size=32><color=#{accentHex}>{BuildCostLabel}</color></size>";
     }
 }
 

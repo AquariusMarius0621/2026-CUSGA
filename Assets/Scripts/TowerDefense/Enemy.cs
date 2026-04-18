@@ -111,6 +111,7 @@ public class Enemy : MonoBehaviour
     private float _slowTimer;
     private int _maxHealth;
     private int _currentHealth;
+    private int _scrapRewardOnDeath;
     private int _targetWaypointIndex;
     private bool _hasReachedBase;
 
@@ -178,9 +179,9 @@ public class Enemy : MonoBehaviour
 
     /// <summary>
     /// Spawn-time runtime setup.
-    /// We intentionally reuse one prototype and inject path / speed / health per wave.
+    /// We intentionally reuse one prototype and inject path / speed / health / scrap reward per wave.
     /// </summary>
-    public void Initialize(EnemyPath path, float moveSpeed, int maxHealth)
+    public void Initialize(EnemyPath path, float moveSpeed, int maxHealth, int scrapRewardOnDeath = 0)
     {
         CacheReferences();
         _baseScale = transform.localScale;
@@ -190,6 +191,7 @@ public class Enemy : MonoBehaviour
         _moveSpeed = moveSpeed;
         _maxHealth = Mathf.Max(1, maxHealth);
         _currentHealth = _maxHealth;
+        _scrapRewardOnDeath = Mathf.Max(0, scrapRewardOnDeath);
         _targetWaypointIndex = 1;
         _hasReachedBase = false;
         _slowMultiplier = 1f;
@@ -308,6 +310,13 @@ public class Enemy : MonoBehaviour
 
     private void Die()
     {
+        // Enemy death is now part of the economy loop:
+        // after a legal kill, the current wave definition can immediately feed scrap back into the player's resource pool.
+        if (_scrapRewardOnDeath > 0 && TowerDefenseGame.Instance != null && !TowerDefenseGame.Instance.IsGameOver)
+        {
+            TowerDefenseGame.Instance.AddScrap(_scrapRewardOnDeath);
+        }
+
         Destroy(gameObject);
     }
 

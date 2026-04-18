@@ -13,7 +13,7 @@ using System;
 /// - HUD 最后怎么显示
 ///
 /// 它只关心状态值本身如何变化，例如：
-/// - 当前电量是多少
+/// - 当前废料是多少
 /// - 基地生命还剩多少
 /// - 当前波次进行到哪一波
 /// - 这一局是否已经进入 Game Over
@@ -23,9 +23,9 @@ using System;
 /// </summary>
 public sealed class TowerDefenseSessionState
 {
-    public TowerDefenseSessionState(int startingEnergy, int startingBaseHealth)
+    public TowerDefenseSessionState(int startingScrap, int startingBaseHealth)
     {
-        CurrentEnergy = Math.Max(0, startingEnergy);
+        CurrentScrap = Math.Max(0, startingScrap);
         CurrentBaseHealth = Math.Max(0, startingBaseHealth);
         CurrentWave = 0;
         TotalWaves = 0;
@@ -33,9 +33,15 @@ public sealed class TowerDefenseSessionState
     }
 
     /// <summary>
-    /// 当前可用于建造的电量。
+    /// 当前可用于建造和升级的废料。
     /// </summary>
-    public int CurrentEnergy { get; private set; }
+    public int CurrentScrap { get; private set; }
+
+    /// <summary>
+    /// `CurrentEnergy` 保留为兼容别名，避免旧链路在迁移过渡期断掉。
+    /// 新玩法语义请统一使用 `CurrentScrap`。
+    /// </summary>
+    public int CurrentEnergy => CurrentScrap;
 
     /// <summary>
     /// 当前基地剩余生命值。
@@ -67,35 +73,51 @@ public sealed class TowerDefenseSessionState
             return false;
         }
 
-        return CurrentEnergy >= cost;
+        return CurrentScrap >= cost;
     }
 
     /// <summary>
-    /// 增加电量。
+    /// 增加废料。
     ///
     /// 这里只接受正数收入，并且在 Game Over 后不再继续改动局内资源，
     /// 这样资源状态不会在结算后被后台逻辑继续污染。
     /// </summary>
-    public bool TryAddEnergy(int amount)
+    public bool TryAddScrap(int amount)
     {
         if (IsGameOver || amount <= 0)
         {
             return false;
         }
 
-        CurrentEnergy += amount;
+        CurrentScrap += amount;
         return true;
     }
 
     /// <summary>
-    /// 直接设置当前电量。
+    /// 旧入口保留成废料接口的兼容壳，方便当前迁移链逐步切换。
+    /// </summary>
+    public bool TryAddEnergy(int amount)
+    {
+        return TryAddScrap(amount);
+    }
+
+    /// <summary>
+    /// 直接设置当前废料。
     ///
     /// 这个入口主要给“真正建塔执行链”使用。
     /// 因为建塔已经在别的地方完成了合法性与扣费判定，这里只做状态写回和下限保护。
     /// </summary>
+    public void SetCurrentScrap(int value)
+    {
+        CurrentScrap = Math.Max(0, value);
+    }
+
+    /// <summary>
+    /// 兼容旧的能量命名入口。
+    /// </summary>
     public void SetCurrentEnergy(int value)
     {
-        CurrentEnergy = Math.Max(0, value);
+        SetCurrentScrap(value);
     }
 
     /// <summary>

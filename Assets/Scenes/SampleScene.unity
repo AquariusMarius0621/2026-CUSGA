@@ -134,7 +134,7 @@ GameObject:
   - component: {fileID: 4181003}
   - component: {fileID: 4181002}
   m_Layer: 5
-  m_Name: EnergyText
+  m_Name: ScrapText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -179,7 +179,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Energy: 0'
+  m_text: 'Scrap: 0'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 489695677}
@@ -1537,10 +1537,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce87fc913043d434ea88564663579395, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startingEnergy: 80
+  startingScrap: 80
   startingBaseHealth: 10
-  relayTowerCost: 30
-  defenseTowerCost: 45
+  relayTowerCost: 0
+  singleTargetTowerCost: 38
+  slowFieldTowerCost: 50
+  bombardTowerCost: 62
   relayPlacementRadius: 0.52
   defensePlacementRadius: 0.58
   relayExpansionSquareSize: 4.5
@@ -1560,7 +1562,7 @@ MonoBehaviour:
   placedTowerRootReference: {fileID: 767248244}
   placementPreviewRootReference: {fileID: 0}
   buildZoneReference: {fileID: 425466730}
-  energyTextReference: {fileID: 4181002}
+  scrapTextReference: {fileID: 4181002}
   baseHealthTextReference: {fileID: 676675441}
   waveTextReference: {fileID: 1436609492}
   selectionTextReference: {fileID: 1313010503}
@@ -1580,7 +1582,7 @@ MonoBehaviour:
   placedTowerRootName: PlacedTowers
   placementPreviewRootName: PlacementPreviewRoot
   buildZoneName: BuildZone
-  energyTextName: EnergyText
+  scrapTextName: ScrapText
   baseHealthTextName: BaseHealthText
   waveTextName: WaveText
   selectionTextName: SelectionText
@@ -1749,7 +1751,7 @@ GameObject:
   - component: {fileID: 346892226}
   - component: {fileID: 346892225}
   m_Layer: 0
-  m_Name: EnergyAccent
+  m_Name: ScrapAccent
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4488,7 +4490,7 @@ GameObject:
   - component: {fileID: 773231569}
   - component: {fileID: 773231568}
   m_Layer: 5
-  m_Name: EnergyCard
+  m_Name: ScrapCard
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8113,9 +8115,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 65a77b8dcb53fc341aeead40f816463f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  energyPerPulse: 12
-  pulseInterval: 3
-  towerColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  supplyRange: 4.5
+  baseSupplyCapacity: 6
+  supplyCapacityPerUpgrade: 2
+  currentLevel: 1
+  maxLevel: 3
+  upgradeCostBase: 16
+  upgradeCostPerLevel: 12
+  normalColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  saturatedColor: {r: 1, g: 0.5, b: 0.18, a: 1}
+  gizmoColor: {r: 1, g: 0.78, b: 0.28, a: 0.8}
 --- !u!1 &1580717929
 GameObject:
   m_ObjectHideFlags: 0
@@ -9164,11 +9173,165 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d6fb9110e79b3a458ce5c48002af9ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 2.8
-  attackInterval: 0.65
-  damagePerShot: 1
-  towerColor: {r: 0.2, g: 0.55, b: 1, a: 1}
+  buildType: 2
+  singleTargetTuning:
+    attackRange: 2.8
+    attackRangePerUpgrade: 0.25
+    attackInterval: 0.72
+    attackIntervalPerUpgradeDelta: -0.08
+    baseDamage: 1
+    damagePerUpgrade: 1
+    shotTraceSprite: {fileID: 0}
+    shotTraceColor: {r: 0.68, g: 0.9, b: 1, a: 0.92}
+    shotTraceThickness: 0.1
+    shotTraceDuration: 0.08
+    basePowerRequired: 2
+    powerRequiredPerUpgrade: 1
+    upgradeCostBase: 26
+    upgradeCostPerLevel: 14
+    slowMultiplier: 0.65
+    slowMultiplierPerUpgradeDelta: -0.05
+    slowDuration: 1.1
+    slowDurationPerUpgrade: 0.2
+    slowPulseSprite: {fileID: 0}
+    slowPulseColor: {r: 0.36, g: 0.95, b: 0.84, a: 0.28}
+    slowPulseDuration: 0.18
+    slowPulseStartScale: 0.2
+    slowPulseScaleMultiplier: 2.1
+    bombFlightTime: 0.45
+    bombFlightTimePerUpgradeDelta: -0.04
+    bombRadius: 1.2
+    bombRadiusPerUpgrade: 0.2
+    bombArcHeight: 0.5
+    bombProjectileScale: 0.18
+    bombExplosionDuration: 0.24
+    bombExplosionScaleMultiplier: 1.45
+    bombProjectileSprite: {fileID: 0}
+    bombExplosionSprite: {fileID: 0}
+    bombProjectileColor: {r: 1, g: 0.76, b: 0.34, a: 1}
+    bombExplosionColor: {r: 1, g: 0.54, b: 0.2, a: 0.9}
+    poweredColor: {r: 0.2, g: 0.55, b: 1, a: 1}
+    signatureSprite: {fileID: 0}
+    signatureColor: {r: 0.42, g: 0.86, b: 1, a: 0.92}
+    signatureOffset: {x: 0, y: -0.5}
+    signatureBaseScale: {x: 0.55, y: 0.08}
+    signatureScalePerRange: {x: 0, y: 0}
+    signatureRotationDegrees: 0
+    signatureRotationSpeed: 0
+    signaturePulseAmplitude: 0.08
+    signaturePulseSpeed: 5.2
+    signatureVerticalBobAmplitude: 0
+    signatureVerticalBobSpeed: 2
+  slowFieldTuning:
+    attackRange: 2.35
+    attackRangePerUpgrade: 0.3
+    attackInterval: 1
+    attackIntervalPerUpgradeDelta: -0.05
+    baseDamage: 0
+    damagePerUpgrade: 1
+    shotTraceSprite: {fileID: 0}
+    shotTraceColor: {r: 0.68, g: 0.9, b: 1, a: 0.92}
+    shotTraceThickness: 0.1
+    shotTraceDuration: 0.08
+    basePowerRequired: 3
+    powerRequiredPerUpgrade: 1
+    upgradeCostBase: 34
+    upgradeCostPerLevel: 16
+    slowMultiplier: 0.7
+    slowMultiplierPerUpgradeDelta: -0.08
+    slowDuration: 1.25
+    slowDurationPerUpgrade: 0.25
+    slowPulseSprite: {fileID: 0}
+    slowPulseColor: {r: 0.36, g: 0.95, b: 0.84, a: 0.28}
+    slowPulseDuration: 0.18
+    slowPulseStartScale: 0.2
+    slowPulseScaleMultiplier: 2.1
+    bombFlightTime: 0.45
+    bombFlightTimePerUpgradeDelta: -0.04
+    bombRadius: 1.2
+    bombRadiusPerUpgrade: 0.2
+    bombArcHeight: 0.5
+    bombProjectileScale: 0.18
+    bombExplosionDuration: 0.24
+    bombExplosionScaleMultiplier: 1.45
+    bombProjectileSprite: {fileID: 0}
+    bombExplosionSprite: {fileID: 0}
+    bombProjectileColor: {r: 1, g: 0.76, b: 0.34, a: 1}
+    bombExplosionColor: {r: 1, g: 0.54, b: 0.2, a: 0.9}
+    poweredColor: {r: 0.32, g: 0.92, b: 0.82, a: 1}
+    signatureSprite: {fileID: 0}
+    signatureColor: {r: 0.3, g: 0.95, b: 0.84, a: 0.18}
+    signatureOffset: {x: 0, y: -0.04}
+    signatureBaseScale: {x: 0.45, y: 0.45}
+    signatureScalePerRange: {x: 0.48, y: 0.48}
+    signatureRotationDegrees: 0
+    signatureRotationSpeed: 0
+    signaturePulseAmplitude: 0.1
+    signaturePulseSpeed: 2.4
+    signatureVerticalBobAmplitude: 0
+    signatureVerticalBobSpeed: 2
+  bombardTuning:
+    attackRange: 3.4
+    attackRangePerUpgrade: 0.35
+    attackInterval: 1.5
+    attackIntervalPerUpgradeDelta: -0.12
+    baseDamage: 2
+    damagePerUpgrade: 2
+    shotTraceSprite: {fileID: 0}
+    shotTraceColor: {r: 0.68, g: 0.9, b: 1, a: 0.92}
+    shotTraceThickness: 0.1
+    shotTraceDuration: 0.08
+    basePowerRequired: 4
+    powerRequiredPerUpgrade: 1
+    upgradeCostBase: 44
+    upgradeCostPerLevel: 20
+    slowMultiplier: 0.65
+    slowMultiplierPerUpgradeDelta: -0.05
+    slowDuration: 1.1
+    slowDurationPerUpgrade: 0.2
+    slowPulseSprite: {fileID: 0}
+    slowPulseColor: {r: 0.36, g: 0.95, b: 0.84, a: 0.28}
+    slowPulseDuration: 0.18
+    slowPulseStartScale: 0.2
+    slowPulseScaleMultiplier: 2.1
+    bombFlightTime: 0.55
+    bombFlightTimePerUpgradeDelta: -0.05
+    bombRadius: 1.15
+    bombRadiusPerUpgrade: 0.3
+    bombArcHeight: 0.6
+    bombProjectileScale: 0.2
+    bombExplosionDuration: 0.28
+    bombExplosionScaleMultiplier: 1.6
+    bombProjectileSprite: {fileID: 0}
+    bombExplosionSprite: {fileID: 0}
+    bombProjectileColor: {r: 1, g: 0.74, b: 0.34, a: 1}
+    bombExplosionColor: {r: 1, g: 0.5, b: 0.22, a: 0.92}
+    poweredColor: {r: 1, g: 0.56, b: 0.24, a: 1}
+    signatureSprite: {fileID: 0}
+    signatureColor: {r: 1, g: 0.72, b: 0.36, a: 0.92}
+    signatureOffset: {x: 0, y: 0.56}
+    signatureBaseScale: {x: 0.22, y: 0.22}
+    signatureScalePerRange: {x: 0, y: 0}
+    signatureRotationDegrees: 45
+    signatureRotationSpeed: 46
+    signaturePulseAmplitude: 0.12
+    signaturePulseSpeed: 3.6
+    signatureVerticalBobAmplitude: 0.05
+    signatureVerticalBobSpeed: 3.1
+  currentLevel: 1
+  maxLevel: 3
   flashColor: {r: 1, g: 1, b: 1, a: 1}
+  offlineColor: {r: 0.24, g: 0.28, b: 0.36, a: 1}
+  flashDuration: 0.06
+  upgradeFlashColor: {r: 1, g: 0.96, b: 0.68, a: 1}
+  upgradePulseDuration: 0.18
+  upgradeScaleMultiplier: 1.14
+  levelPipSprite: {fileID: 0}
+  levelPipColor: {r: 0.98, g: 0.96, b: 0.78, a: 1}
+  levelPipOffset: {x: 0, y: -0.65}
+  levelPipSpacing: 0.22
+  levelPipScale: 0.12
+  levelPipSortingOffset: 3
 --- !u!1 &1729006010
 GameObject:
   m_ObjectHideFlags: 0
@@ -10475,14 +10638,17 @@ MonoBehaviour:
     spawnInterval: 1
     moveSpeed: 1.8
     enemyHealth: 3
+    enemyScrapReward: 8
   - enemyCount: 6
     spawnInterval: 0.85
     moveSpeed: 2.1
     enemyHealth: 4
+    enemyScrapReward: 11
   - enemyCount: 8
     spawnInterval: 0.7
     moveSpeed: 2.4
     enemyHealth: 6
+    enemyScrapReward: 15
 --- !u!1 &1780775581
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 /// <summary>
 /// `TowerDefensePresentationCoordinator` 负责把“局内运行状态”和“表现层输出”接起来。
@@ -21,6 +22,8 @@ public sealed class TowerDefensePresentationCoordinator
     private readonly Func<PlacedStructureHudState> _placedStructureHudStateQuery;
     private readonly Func<TowerType, bool> _canAffordTower;
     private readonly Action _refreshStarterZoneMarker;
+    private string _transientHudNotice = string.Empty;
+    private float _transientHudNoticeHideAt = -1f;
 
     private TowerDefenseHudPresenter _hudPresenter;
     private TowerCatalog _towerCatalog;
@@ -78,6 +81,24 @@ public sealed class TowerDefensePresentationCoordinator
     public void SetStatusMessage(string message)
     {
         _hudPresenter?.SetStatusMessage(message);
+    }
+
+    /// <summary>
+    /// `ShowTransientHudNotice()` is used for short-lived runtime feedback,
+    /// especially resource deltas and wave-economy hints.
+    /// We keep it separate from the old status-message API so we can surface economic flow
+    /// without reviving a permanent status strip.
+    /// </summary>
+    public void ShowTransientHudNotice(string message, float duration = 2.5f)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        _transientHudNotice = message;
+        _transientHudNoticeHideAt = Time.unscaledTime + Mathf.Max(0.25f, duration);
+        RefreshHud();
     }
 
     /// <summary>
@@ -142,7 +163,7 @@ public sealed class TowerDefensePresentationCoordinator
             : TowerType.None;
 
         return new TowerDefenseHudState(
-            currentEnergy: sessionState != null ? sessionState.CurrentEnergy : 0,
+            currentScrap: sessionState != null ? sessionState.CurrentScrap : 0,
             currentBaseHealth: sessionState != null ? sessionState.CurrentBaseHealth : 0,
             currentWave: sessionState != null ? sessionState.CurrentWave : 0,
             totalWaves: sessionState != null ? sessionState.TotalWaves : 0,
@@ -151,7 +172,25 @@ public sealed class TowerDefensePresentationCoordinator
             dragTowerType: dragTowerType,
             placedStructureState: _placedStructureHudStateQuery != null
                 ? _placedStructureHudStateQuery()
-                : new PlacedStructureHudState(false, string.Empty, string.Empty));
+                : new PlacedStructureHudState(false, string.Empty, string.Empty),
+            transientNotice: GetTransientHudNotice());
+    }
+
+    private string GetTransientHudNotice()
+    {
+        if (string.IsNullOrWhiteSpace(_transientHudNotice))
+        {
+            return string.Empty;
+        }
+
+        if (Time.unscaledTime > _transientHudNoticeHideAt)
+        {
+            _transientHudNotice = string.Empty;
+            _transientHudNoticeHideAt = -1f;
+            return string.Empty;
+        }
+
+        return _transientHudNotice;
     }
 
     /// <summary>

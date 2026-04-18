@@ -33,7 +33,7 @@ public sealed class TowerPlacementInteractionController
     public delegate bool PlacementValidator(Vector3 worldPosition, TowerType towerType, out string invalidReason);
 
     private readonly Func<bool> _isGameOverQuery;
-    private readonly Func<int> _currentEnergyQuery;
+    private readonly Func<int> _currentScrapQuery;
     private readonly Func<TowerType, bool> _canAffordTower;
     private readonly Func<TowerType, GameObject> _getPrototype;
     private readonly Func<TowerType, string> _getTowerDisplayName;
@@ -64,7 +64,7 @@ public sealed class TowerPlacementInteractionController
 
     public TowerPlacementInteractionController(
         Func<bool> isGameOverQuery,
-        Func<int> currentEnergyQuery,
+        Func<int> currentScrapQuery,
         Func<TowerType, bool> canAffordTower,
         Func<TowerType, GameObject> getPrototype,
         Func<TowerType, string> getTowerDisplayName,
@@ -77,7 +77,7 @@ public sealed class TowerPlacementInteractionController
         Action<string> logPlacementDiagnostic)
     {
         _isGameOverQuery = isGameOverQuery;
-        _currentEnergyQuery = currentEnergyQuery;
+        _currentScrapQuery = currentScrapQuery;
         _canAffordTower = canAffordTower;
         _getPrototype = getPrototype;
         _getTowerDisplayName = getTowerDisplayName;
@@ -227,9 +227,9 @@ public sealed class TowerPlacementInteractionController
         {
             _selectedTowerType = towerType;
             _refreshHud?.Invoke();
-            int currentEnergy = _currentEnergyQuery != null ? _currentEnergyQuery() : 0;
-            _setStatusMessage?.Invoke($"Not enough energy. You currently have {currentEnergy} EN.");
-            _logPlacementDiagnostic?.Invoke($"Begin drag rejected: insufficient energy for {towerType}.");
+            int currentScrap = _currentScrapQuery != null ? _currentScrapQuery() : 0;
+            _setStatusMessage?.Invoke($"Not enough scrap. You currently have {currentScrap} SCRAP.");
+            _logPlacementDiagnostic?.Invoke($"Begin drag rejected: insufficient scrap for {towerType}.");
             return false;
         }
 

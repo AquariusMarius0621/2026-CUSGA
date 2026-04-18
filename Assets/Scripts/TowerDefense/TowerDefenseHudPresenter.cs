@@ -21,16 +21,17 @@ using UnityEngine.UI;
 public readonly struct TowerDefenseHudState
 {
     public TowerDefenseHudState(
-        int currentEnergy,
+        int currentScrap,
         int currentBaseHealth,
         int currentWave,
         int totalWaves,
         TowerType selectedTowerType,
         bool isPlacementDragActive,
         TowerType dragTowerType,
-        PlacedStructureHudState placedStructureState)
+        PlacedStructureHudState placedStructureState,
+        string transientNotice)
     {
-        CurrentEnergy = currentEnergy;
+        CurrentScrap = currentScrap;
         CurrentBaseHealth = currentBaseHealth;
         CurrentWave = currentWave;
         TotalWaves = totalWaves;
@@ -38,9 +39,10 @@ public readonly struct TowerDefenseHudState
         IsPlacementDragActive = isPlacementDragActive;
         DragTowerType = dragTowerType;
         PlacedStructureState = placedStructureState;
+        TransientNotice = transientNotice ?? string.Empty;
     }
 
-    public int CurrentEnergy { get; }
+    public int CurrentScrap { get; }
 
     public int CurrentBaseHealth { get; }
 
@@ -55,6 +57,8 @@ public readonly struct TowerDefenseHudState
     public TowerType DragTowerType { get; }
 
     public PlacedStructureHudState PlacedStructureState { get; }
+
+    public string TransientNotice { get; }
 }
 
 public readonly struct PlacedStructureHudState
@@ -110,7 +114,7 @@ public readonly struct TowerDragPreviewState
 /// </summary>
 public sealed class TowerDefenseHudPresenter
 {
-    private TMP_Text _energyText;
+    private TMP_Text _scrapText;
     private TMP_Text _baseHealthText;
     private TMP_Text _waveText;
     private TMP_Text _selectionText;
@@ -144,7 +148,7 @@ public sealed class TowerDefenseHudPresenter
     /// 但新补好的场景已经能立刻摆脱“改名就炸”的脆弱模式。
     /// </summary>
     public void BindSceneReferences(
-        TMP_Text energyText,
+        TMP_Text scrapText,
         TMP_Text baseHealthText,
         TMP_Text waveText,
         TMP_Text selectionText,
@@ -159,7 +163,7 @@ public sealed class TowerDefenseHudPresenter
         GameObject dragPreviewPanel,
         TMP_Text dragPreviewLabel)
     {
-        _energyText = energyText;
+        _scrapText = scrapText;
         _baseHealthText = baseHealthText;
         _waveText = waveText;
         _selectionText = selectionText;
@@ -221,7 +225,7 @@ public sealed class TowerDefenseHudPresenter
 
         EnsureDragPreviewDoesNotBlockRaycasts();
 
-        WarnIfMissing(_energyText, "EnergyText");
+        WarnIfMissing(_scrapText, "ScrapText");
         WarnIfMissing(_baseHealthText, "BaseHealthText");
         WarnIfMissing(_waveText, "WaveText");
         WarnIfMissing(_selectionText, "SelectionText");
@@ -320,9 +324,9 @@ public sealed class TowerDefenseHudPresenter
     /// </summary>
     public void Refresh(TowerDefenseHudState state, TowerCatalog towerCatalog, Func<TowerType, bool> canAffordTower)
     {
-        if (_energyText != null)
+        if (_scrapText != null)
         {
-            _energyText.text = BuildMetricText("ENERGY GRID", state.CurrentEnergy.ToString(), "FFB567");
+            _scrapText.text = BuildMetricText("SCRAP STOCK", state.CurrentScrap.ToString(), "FFB567");
         }
 
         if (_baseHealthText != null)
@@ -411,7 +415,7 @@ public sealed class TowerDefenseHudPresenter
         _dragPreviewLabel.text =
             "<size=20><color=#97B2C8>DEPLOY TRACE</color></size>\n" +
             $"<size=34>{definition.DisplayName.ToUpperInvariant()}</size>\n" +
-            $"<size=20><color=#{accentHex}>{definition.BuildCost} EN</color>  <color=#88A5BC>GRID {definition.ExpansionSquareSize:0.0}</color></size>\n" +
+            $"<size=20><color=#{accentHex}>{definition.BuildCostLabel}</color>  <color=#88A5BC>GRID {definition.ExpansionSquareSize:0.0}</color></size>\n" +
             "<size=18><color=#87A5BD>Cyan sectors show exact legal drop zones</color></size>\n" +
             $"<size=18>{stateLine}</size>";
     }
@@ -485,10 +489,12 @@ public sealed class TowerDefenseHudPresenter
             if (draggingDefinition != null)
             {
                 string accentHex = ColorUtility.ToHtmlStringRGB(draggingDefinition.AccentColor);
-                return
+                return AppendTransientNotice(
+                    baseText:
                     "DEPLOY TRACE\n" +
                     $"<size=30>{draggingDefinition.DisplayName}</size>\n" +
-                    $"<size=20><color=#{accentHex}>{draggingDefinition.BuildCost} EN</color>  <color=#89A7BF>Cyan sectors = exact legal zone</color></size>";
+                    $"<size=20><color=#{accentHex}>{draggingDefinition.BuildCostLabel}</color>  <color=#89A7BF>Cyan sectors = exact legal zone</color></size>",
+                    transientNotice: state.TransientNotice);
             }
         }
 
@@ -498,26 +504,68 @@ public sealed class TowerDefenseHudPresenter
             if (selectedDefinition != null)
             {
                 string accentHex = ColorUtility.ToHtmlStringRGB(selectedDefinition.AccentColor);
-                return
+                string economyLine = BuildSelectionEconomyLine(state.CurrentScrap, selectedDefinition);
+                return AppendTransientNotice(
+                    baseText:
                     "TACTICAL READY\n" +
                     $"<size=30>{selectedDefinition.DisplayName}</size>\n" +
                     $"<size=20><color=#{accentHex}>{selectedDefinition.SelectionHint}</color></size>\n" +
-                    $"<size=18><color=#8AA7BF>{selectedDefinition.UpgradeFocusSummary}</color></size>";
+                    $"<size=18><color=#8AA7BF>{selectedDefinition.UpgradeFocusSummary}</color></size>\n" +
+                    $"<size=18>{economyLine}</size>",
+                    transientNotice: state.TransientNotice);
             }
         }
 
         if (state.PlacedStructureState.HasSelection)
         {
-            return
+            return AppendTransientNotice(
+                baseText:
                 "STRUCTURE LINK\n" +
                 $"<size=30>{state.PlacedStructureState.Title}</size>\n" +
-                $"<size=18><color=#89A7BF>{state.PlacedStructureState.Details}</color></size>";
+                $"<size=18><color=#89A7BF>{state.PlacedStructureState.Details}</color></size>",
+                transientNotice: state.TransientNotice);
         }
 
-        return
+        return AppendTransientNotice(
+            baseText:
             "OPERATION LINK\n" +
             "<size=28>Click or drag a tower card to project legal sectors</size>\n" +
-            "<size=20><color=#89A7BF>1 Relay / 2 Single / 3 Slow / 4 Bomb / Esc Cancel</color></size>";
+            "<size=20><color=#89A7BF>1 Relay / 2 Single / 3 Slow / 4 Bomb / Esc Cancel</color></size>",
+            transientNotice: state.TransientNotice);
+    }
+
+    private static string AppendTransientNotice(string baseText, string transientNotice)
+    {
+        if (string.IsNullOrWhiteSpace(transientNotice))
+        {
+            return baseText;
+        }
+
+        string accentColor = transientNotice.StartsWith("+", StringComparison.Ordinal)
+            ? "#7DF3B1"
+            : "#FFD878";
+        return $"{baseText}\n<size=18><color={accentColor}>{transientNotice}</color></size>";
+    }
+
+    private static string BuildSelectionEconomyLine(int currentScrap, TowerDefinition definition)
+    {
+        if (definition == null)
+        {
+            return string.Empty;
+        }
+
+        if (definition.BuildCost <= 0)
+        {
+            return "<color=#7DF3B1>FREE deploy. Scrap remains unchanged.</color>";
+        }
+
+        int remainingAfterBuild = currentScrap - definition.BuildCost;
+        if (remainingAfterBuild >= 0)
+        {
+            return $"<color=#7DF3B1>{remainingAfterBuild} SCRAP left after deploy.</color>";
+        }
+
+        return $"<color=#FF7282>Need {-remainingAfterBuild} more SCRAP to deploy.</color>";
     }
 
     /// <summary>

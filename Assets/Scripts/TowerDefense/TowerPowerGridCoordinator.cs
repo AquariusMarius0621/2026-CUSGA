@@ -171,7 +171,7 @@ public sealed class TowerPowerGridCoordinator
         upgradeCost = relay.GetUpgradeCost();
         if (availableEnergy < upgradeCost)
         {
-            invalidReason = $"Not enough energy. Upgrade requires {upgradeCost} EN.";
+            invalidReason = $"Not enough scrap. Upgrade requires {upgradeCost} SCRAP.";
             return false;
         }
 
@@ -198,7 +198,7 @@ public sealed class TowerPowerGridCoordinator
         upgradeCost = tower.GetUpgradeCost();
         if (availableEnergy < upgradeCost)
         {
-            invalidReason = $"Not enough energy. Upgrade requires {upgradeCost} EN.";
+            invalidReason = $"Not enough scrap. Upgrade requires {upgradeCost} SCRAP.";
             return false;
         }
 

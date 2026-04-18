@@ -12,7 +12,7 @@ using UnityEngine.UI;
 public readonly struct TowerDefenseHudSceneReferences
 {
     public TowerDefenseHudSceneReferences(
-        TMP_Text energyText,
+        TMP_Text scrapText,
         TMP_Text baseHealthText,
         TMP_Text waveText,
         TMP_Text selectionText,
@@ -27,7 +27,7 @@ public readonly struct TowerDefenseHudSceneReferences
         GameObject dragPreviewPanel,
         TMP_Text dragPreviewLabel)
     {
-        EnergyText = energyText;
+        ScrapText = scrapText;
         BaseHealthText = baseHealthText;
         WaveText = waveText;
         SelectionText = selectionText;
@@ -43,7 +43,7 @@ public readonly struct TowerDefenseHudSceneReferences
         DragPreviewLabel = dragPreviewLabel;
     }
 
-    public TMP_Text EnergyText { get; }
+    public TMP_Text ScrapText { get; }
     public TMP_Text BaseHealthText { get; }
     public TMP_Text WaveText { get; }
     public TMP_Text SelectionText { get; }
@@ -121,7 +121,7 @@ public sealed class TowerDefenseSceneBootstrapper
         TowerDefenseHudPresenter hudPresenter)
     {
         hudPresenter?.BindSceneReferences(
-            energyText: hudSceneReferences.EnergyText,
+            scrapText: hudSceneReferences.ScrapText,
             baseHealthText: hudSceneReferences.BaseHealthText,
             waveText: hudSceneReferences.WaveText,
             selectionText: hudSceneReferences.SelectionText,

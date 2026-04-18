@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
@@ -32,12 +33,13 @@ public class TowerDefenseGame : MonoBehaviour
     public static TowerDefenseGame Instance { get; private set; }
 
     [Header("Core Rules")]
-    [SerializeField] private int startingEnergy = 80;
+    [FormerlySerializedAs("startingEnergy")]
+    [SerializeField] private int startingScrap = 80;
     [SerializeField] private int startingBaseHealth = 10;
     [SerializeField] private int relayTowerCost = 0;
-    [SerializeField] private int singleTargetTowerCost = 45;
-    [SerializeField] private int slowFieldTowerCost = 55;
-    [SerializeField] private int bombardTowerCost = 65;
+    [SerializeField] private int singleTargetTowerCost = 38;
+    [SerializeField] private int slowFieldTowerCost = 50;
+    [SerializeField] private int bombardTowerCost = 62;
 
     [Header("Placement Rules")]
     [SerializeField] private float relayPlacementRadius = 0.52f;
@@ -91,7 +93,8 @@ public class TowerDefenseGame : MonoBehaviour
     /// 这一组是玩法 HUD 的显式场景引用。
     /// 当前策略是优先直接拖 Inspector，引导项目逐步摆脱按名字查找 UI 对象的旧做法。
     /// </summary>
-    [SerializeField] private TMP_Text energyTextReference;
+    [FormerlySerializedAs("energyTextReference")]
+    [SerializeField] private TMP_Text scrapTextReference;
     [SerializeField] private TMP_Text baseHealthTextReference;
     [SerializeField] private TMP_Text waveTextReference;
     [SerializeField] private TMP_Text selectionTextReference;
@@ -205,7 +208,7 @@ public class TowerDefenseGame : MonoBehaviour
         Time.timeScale = 1f;
         Application.runInBackground = true;
 
-        _sessionState = new TowerDefenseSessionState(startingEnergy, startingBaseHealth);
+        _sessionState = new TowerDefenseSessionState(startingScrap, startingBaseHealth);
         InitializeArchitectureModules();
     }
 
@@ -307,17 +310,26 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
     /// <summary>
-    /// 增加电量。
+    /// 增加废料。
     /// 这里只接受正数收入，并且在 Game Over 后不再改动局内资源。
     /// </summary>
-    public void AddEnergy(int amount)
+    public void AddScrap(int amount)
     {
-        if (_sessionState == null || !_sessionState.TryAddEnergy(amount))
+        if (_sessionState == null || !_sessionState.TryAddScrap(amount))
         {
             return;
         }
 
+        ShowTransientHudNotice($"+{amount} SCRAP recovered.");
         RefreshHud();
+    }
+
+    /// <summary>
+    /// 兼容旧的能量命名入口。
+    /// </summary>
+    public void AddEnergy(int amount)
+    {
+        AddScrap(amount);
     }
 
     /// <summary>
@@ -357,6 +369,11 @@ public class TowerDefenseGame : MonoBehaviour
     public void SetStatusMessage(string message)
     {
         _presentationCoordinator?.SetStatusMessage(message);
+    }
+
+    public void ShowTransientHudNotice(string message, float duration = 2.5f)
+    {
+        _presentationCoordinator?.ShowTransientHudNotice(message, duration);
     }
 
     /// <summary>
@@ -401,7 +418,7 @@ public class TowerDefenseGame : MonoBehaviour
     }
 
     /// <summary>
-    /// 判断当前电量是否足够支付指定塔型的造价。
+    /// 判断当前废料是否足够支付指定塔型的造价。
     /// `None` 永远视为不可购买，这样可以避免“未选中状态”误走通过分支。
     /// </summary>
     public bool CanAffordTower(TowerType towerType)
@@ -426,7 +443,7 @@ public class TowerDefenseGame : MonoBehaviour
         {
             if (!_powerGridCoordinator.CanUpgradeRelay(
                     _selectedRelayTower,
-                    _sessionState.CurrentEnergy,
+                    _sessionState.CurrentScrap,
                     out int upgradeCost,
                     out string invalidReason))
             {
@@ -435,10 +452,11 @@ public class TowerDefenseGame : MonoBehaviour
                 return false;
             }
 
-            _sessionState.SetCurrentEnergy(_sessionState.CurrentEnergy - upgradeCost);
+            _sessionState.SetCurrentScrap(_sessionState.CurrentScrap - upgradeCost);
             _powerGridCoordinator.ApplyRelayUpgrade(_selectedRelayTower);
             SetStatusMessage(
                 $"Relay #{_selectedRelayTower.RelayNumber} upgraded to LV {_selectedRelayTower.CurrentLevel}. Capacity is now {_selectedRelayTower.SupplyCapacity}.");
+            ShowTransientHudNotice($"-{upgradeCost} SCRAP relay upgrade.", 2.2f);
             InvalidatePlacementAreaOverlayCache();
             RefreshHud();
             return true;
@@ -448,7 +466,7 @@ public class TowerDefenseGame : MonoBehaviour
         {
             if (!_powerGridCoordinator.CanUpgradeDefenseTower(
                     _selectedDefenseTower,
-                    _sessionState.CurrentEnergy,
+                    _sessionState.CurrentScrap,
                     out int upgradeCost,
                     out string invalidReason))
             {
@@ -457,10 +475,11 @@ public class TowerDefenseGame : MonoBehaviour
                 return false;
             }
 
-            _sessionState.SetCurrentEnergy(_sessionState.CurrentEnergy - upgradeCost);
+            _sessionState.SetCurrentScrap(_sessionState.CurrentScrap - upgradeCost);
             _powerGridCoordinator.ApplyDefenseTowerUpgrade(_selectedDefenseTower);
             SetStatusMessage(
                 $"{GetTowerDisplayName(_selectedDefenseTower.BuildType)} #{_selectedDefenseTower.TowerNumber} upgraded to LV {_selectedDefenseTower.CurrentLevel}. Power demand is now {_selectedDefenseTower.PowerRequired}.");
+            ShowTransientHudNotice($"-{upgradeCost} SCRAP tower upgrade.", 2.2f);
             RefreshHud();
             return true;
         }
@@ -612,7 +631,7 @@ public class TowerDefenseGame : MonoBehaviour
         _hudPresenter = new TowerDefenseHudPresenter();
         _placementInteractionController = new TowerPlacementInteractionController(
             isGameOverQuery: () => _sessionState != null && _sessionState.IsGameOver,
-            currentEnergyQuery: () => _sessionState != null ? _sessionState.CurrentEnergy : 0,
+            currentScrapQuery: () => _sessionState != null ? _sessionState.CurrentScrap : 0,
             canAffordTower: CanAffordTower,
             getPrototype: GetPrototype,
             getTowerDisplayName: GetTowerDisplayName,
@@ -627,8 +646,8 @@ public class TowerDefenseGame : MonoBehaviour
             logPlacementDiagnostic: LogPlacementDiagnostic);
         _placementBuildExecutor = new TowerPlacementBuildExecutor(
             isGameOverQuery: () => _sessionState != null && _sessionState.IsGameOver,
-            currentEnergyQuery: () => _sessionState != null ? _sessionState.CurrentEnergy : 0,
-            setCurrentEnergy: value => _sessionState?.SetCurrentEnergy(value),
+            currentScrapQuery: () => _sessionState != null ? _sessionState.CurrentScrap : 0,
+            setCurrentScrap: value => _sessionState?.SetCurrentScrap(value),
             getTowerCost: GetTowerCost,
             getTowerDisplayName: GetTowerDisplayName,
             getPrototype: GetPrototype,
@@ -729,11 +748,12 @@ public class TowerDefenseGame : MonoBehaviour
             string invalidReason = string.Empty;
             bool canUpgrade = _powerGridCoordinator != null &&
                               _sessionState != null &&
-                              _powerGridCoordinator.CanUpgradeRelay(_selectedRelayTower, _sessionState.CurrentEnergy, out upgradeCost, out invalidReason);
+                              _powerGridCoordinator.CanUpgradeRelay(_selectedRelayTower, _sessionState.CurrentScrap, out upgradeCost, out invalidReason);
             string detail = $"Relay #{_selectedRelayTower.RelayNumber} / LV {_selectedRelayTower.CurrentLevel} / Load {_selectedRelayTower.CurrentAssignedLoad}/{_selectedRelayTower.SupplyCapacity}";
             detail += $"\nRange {_selectedRelayTower.SupplyRange:0.0} / Next cap {_selectedRelayTower.PreviewUpgradedSupplyCapacity()}";
             detail += canUpgrade
-                ? $"\nU Upgrade ({upgradeCost} EN) / Delete Dismantle"
+                ? $"\nAfter upgrade: {_sessionState.CurrentScrap - upgradeCost} SCRAP left."
+                  + $"\nU Upgrade ({upgradeCost} SCRAP) / Delete Dismantle"
                 : $"\n{invalidReason}";
             return new PlacedStructureHudState(true, "Relay Node", detail);
         }
@@ -747,12 +767,13 @@ public class TowerDefenseGame : MonoBehaviour
                 : _selectedDefenseTower.PowerStatusMessage;
             bool canUpgrade = _powerGridCoordinator != null &&
                               _sessionState != null &&
-                              _powerGridCoordinator.CanUpgradeDefenseTower(_selectedDefenseTower, _sessionState.CurrentEnergy, out upgradeCost, out invalidReason);
+                              _powerGridCoordinator.CanUpgradeDefenseTower(_selectedDefenseTower, _sessionState.CurrentScrap, out upgradeCost, out invalidReason);
             string detail = $"Turret #{_selectedDefenseTower.TowerNumber} / LV {_selectedDefenseTower.CurrentLevel} / {powerState}";
             detail += $"\n{_selectedDefenseTower.BuildCurrentCombatSummary()}";
             detail += $"\n{_selectedDefenseTower.BuildUpgradePreviewSummary()}";
             detail += canUpgrade
-                ? $"\nU Upgrade ({upgradeCost} EN) / Delete Dismantle"
+                ? $"\nAfter upgrade: {_sessionState.CurrentScrap - upgradeCost} SCRAP left."
+                  + $"\nU Upgrade ({upgradeCost} SCRAP) / Delete Dismantle"
                 : $"\n{invalidReason}";
             return new PlacedStructureHudState(true, GetTowerDisplayName(_selectedDefenseTower.BuildType), detail);
         }
@@ -1057,7 +1078,7 @@ public class TowerDefenseGame : MonoBehaviour
             buildZoneReference,
             buildZoneName,
             new TowerDefenseHudSceneReferences(
-                energyTextReference,
+                scrapTextReference,
                 baseHealthTextReference,
                 waveTextReference,
                 selectionTextReference,

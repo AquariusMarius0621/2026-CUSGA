@@ -29,8 +29,8 @@ public sealed class TowerPlacementBuildExecutor
     public delegate bool PlacementValidator(Vector3 worldPosition, TowerType towerType, out string invalidReason);
 
     private readonly Func<bool> _isGameOverQuery;
-    private readonly Func<int> _currentEnergyQuery;
-    private readonly Action<int> _setCurrentEnergy;
+    private readonly Func<int> _currentScrapQuery;
+    private readonly Action<int> _setCurrentScrap;
     private readonly Func<TowerType, int> _getTowerCost;
     private readonly Func<TowerType, string> _getTowerDisplayName;
     private readonly Func<TowerType, GameObject> _getPrototype;
@@ -49,8 +49,8 @@ public sealed class TowerPlacementBuildExecutor
     /// </summary>
     public TowerPlacementBuildExecutor(
         Func<bool> isGameOverQuery,
-        Func<int> currentEnergyQuery,
-        Action<int> setCurrentEnergy,
+        Func<int> currentScrapQuery,
+        Action<int> setCurrentScrap,
         Func<TowerType, int> getTowerCost,
         Func<TowerType, string> getTowerDisplayName,
         Func<TowerType, GameObject> getPrototype,
@@ -64,8 +64,8 @@ public sealed class TowerPlacementBuildExecutor
         Action<string> logPlacementDiagnostic)
     {
         _isGameOverQuery = isGameOverQuery;
-        _currentEnergyQuery = currentEnergyQuery;
-        _setCurrentEnergy = setCurrentEnergy;
+        _currentScrapQuery = currentScrapQuery;
+        _setCurrentScrap = setCurrentScrap;
         _getTowerCost = getTowerCost;
         _getTowerDisplayName = getTowerDisplayName;
         _getPrototype = getPrototype;
@@ -106,12 +106,12 @@ public sealed class TowerPlacementBuildExecutor
             return false;
         }
 
-        int currentEnergy = _currentEnergyQuery != null ? _currentEnergyQuery() : 0;
+        int currentScrap = _currentScrapQuery != null ? _currentScrapQuery() : 0;
         int cost = _getTowerCost != null ? _getTowerCost(towerType) : 0;
-        if (currentEnergy < cost)
+        if (currentScrap < cost)
         {
-            _setStatusMessage?.Invoke($"Not enough energy. You currently have {currentEnergy} EN.");
-            _logPlacementDiagnostic?.Invoke($"TryPlace rejected: insufficient energy. tower={towerType} cost={cost} currentEnergy={currentEnergy}");
+            _setStatusMessage?.Invoke($"Not enough scrap. You currently have {currentScrap} SCRAP.");
+            _logPlacementDiagnostic?.Invoke($"TryPlace rejected: insufficient scrap. tower={towerType} cost={cost} currentScrap={currentScrap}");
             return false;
         }
 
@@ -168,10 +168,11 @@ public sealed class TowerPlacementBuildExecutor
         }
 
         _registerPlacedStructure?.Invoke(tower, towerType);
-        _setCurrentEnergy?.Invoke(currentEnergy - cost);
+        _setCurrentScrap?.Invoke(currentScrap - cost);
         _invalidatePlacementAreaOverlayCache?.Invoke();
-        _setStatusMessage?.Invoke($"Deployed {towerDisplayName} for {cost} EN.");
-        _logPlacementDiagnostic?.Invoke($"TryPlace succeeded: tower={towerType} world={worldPosition} cost={cost} remainingEnergy={currentEnergy - cost}");
+        _setStatusMessage?.Invoke($"Deployed {towerDisplayName} for {cost} SCRAP.");
+        TowerDefenseGame.Instance?.ShowTransientHudNotice($"-{cost} SCRAP spent.", 2.2f);
+        _logPlacementDiagnostic?.Invoke($"TryPlace succeeded: tower={towerType} world={worldPosition} cost={cost} remainingScrap={currentScrap - cost}");
         _refreshHud?.Invoke();
         return true;
     }
