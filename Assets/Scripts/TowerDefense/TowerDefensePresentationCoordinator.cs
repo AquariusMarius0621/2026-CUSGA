@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -20,24 +21,31 @@ public sealed class TowerDefensePresentationCoordinator
     private readonly Func<TowerDefenseSessionState> _sessionStateQuery;
     private readonly Func<TowerPlacementInteractionController> _interactionControllerQuery;
     private readonly Func<PlacedStructureHudState> _placedStructureHudStateQuery;
+    private readonly Func<PowerGridHudSnapshot> _powerGridHudSnapshotQuery;
     private readonly Func<TowerType, bool> _canAffordTower;
     private readonly Action _refreshStarterZoneMarker;
-    private string _transientHudNotice = string.Empty;
+    private readonly List<HudNoticeEntry> _recentHudNotices = new List<HudNoticeEntry>();
+    private HudNoticeEntry _transientHudNotice = new HudNoticeEntry(string.Empty, HudNoticeTone.Neutral);
     private float _transientHudNoticeHideAt = -1f;
+    private string _currentStatusMessage = string.Empty;
 
     private TowerDefenseHudPresenter _hudPresenter;
     private TowerCatalog _towerCatalog;
+
+    private const int MaxHudNoticeHistory = 4;
 
     public TowerDefensePresentationCoordinator(
         Func<TowerDefenseSessionState> sessionStateQuery,
         Func<TowerPlacementInteractionController> interactionControllerQuery,
         Func<PlacedStructureHudState> placedStructureHudStateQuery,
+        Func<PowerGridHudSnapshot> powerGridHudSnapshotQuery,
         Func<TowerType, bool> canAffordTower,
         Action refreshStarterZoneMarker)
     {
         _sessionStateQuery = sessionStateQuery;
         _interactionControllerQuery = interactionControllerQuery;
         _placedStructureHudStateQuery = placedStructureHudStateQuery;
+        _powerGridHudSnapshotQuery = powerGridHudSnapshotQuery;
         _canAffordTower = canAffordTower;
         _refreshStarterZoneMarker = refreshStarterZoneMarker;
     }
@@ -80,24 +88,30 @@ public sealed class TowerDefensePresentationCoordinator
     /// </summary>
     public void SetStatusMessage(string message)
     {
+        _currentStatusMessage = message ?? string.Empty;
         _hudPresenter?.SetStatusMessage(message);
+        RefreshHud();
     }
 
     /// <summary>
-    /// `ShowTransientHudNotice()` is used for short-lived runtime feedback,
-    /// especially resource deltas and wave-economy hints.
-    /// We keep it separate from the old status-message API so we can surface economic flow
-    /// without reviving a permanent status strip.
+    /// `ShowTransientHudNotice()` 负责短时高亮反馈，
+    /// 同时也会把消息写入最近事件流。
+    ///
+    /// 这样同一条反馈会有两层承载：
+    /// - 短时间醒目高亮，避免玩家错过
+    /// - 最近事件记录，避免一闪而过后彻底丢失
     /// </summary>
-    public void ShowTransientHudNotice(string message, float duration = 2.5f)
+    public void ShowTransientHudNotice(string message, float duration = 2.5f, HudNoticeTone tone = HudNoticeTone.Auto)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
             return;
         }
 
-        _transientHudNotice = message;
+        HudNoticeEntry notice = new HudNoticeEntry(message, tone);
+        _transientHudNotice = notice;
         _transientHudNoticeHideAt = Time.unscaledTime + Mathf.Max(0.25f, duration);
+        PushNoticeToHistory(notice);
         RefreshHud();
     }
 
@@ -173,24 +187,40 @@ public sealed class TowerDefensePresentationCoordinator
             placedStructureState: _placedStructureHudStateQuery != null
                 ? _placedStructureHudStateQuery()
                 : new PlacedStructureHudState(false, string.Empty, string.Empty),
-            transientNotice: GetTransientHudNotice());
+            powerGridSnapshot: _powerGridHudSnapshotQuery != null
+                ? _powerGridHudSnapshotQuery()
+                : new PowerGridHudSnapshot(0, 0, 0, 0, 0, 0, 0, string.Empty),
+            currentStatusMessage: _currentStatusMessage,
+            transientNotice: GetTransientHudNoticeEntry(),
+            recentHudNotices: _recentHudNotices.ToArray());
     }
 
-    private string GetTransientHudNotice()
+    private HudNoticeEntry GetTransientHudNoticeEntry()
     {
-        if (string.IsNullOrWhiteSpace(_transientHudNotice))
+        if (!_transientHudNotice.HasMessage)
         {
-            return string.Empty;
+            return new HudNoticeEntry(string.Empty, HudNoticeTone.Neutral);
         }
 
         if (Time.unscaledTime > _transientHudNoticeHideAt)
         {
-            _transientHudNotice = string.Empty;
+            _transientHudNotice = new HudNoticeEntry(string.Empty, HudNoticeTone.Neutral);
             _transientHudNoticeHideAt = -1f;
-            return string.Empty;
+            return new HudNoticeEntry(string.Empty, HudNoticeTone.Neutral);
         }
 
         return _transientHudNotice;
+    }
+
+    private void PushNoticeToHistory(HudNoticeEntry notice)
+    {
+        _recentHudNotices.RemoveAll(existing => existing.Message == notice.Message && existing.Tone == notice.Tone);
+        _recentHudNotices.Insert(0, notice);
+
+        if (_recentHudNotices.Count > MaxHudNoticeHistory)
+        {
+            _recentHudNotices.RemoveRange(MaxHudNoticeHistory, _recentHudNotices.Count - MaxHudNoticeHistory);
+        }
     }
 
     /// <summary>

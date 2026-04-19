@@ -57,6 +57,143 @@ public sealed class MainMenuController : MonoBehaviour
     /// </summary>
     [SerializeField] private Color secondaryAccent = new Color(0.31f, 0.86f, 0.96f, 1f);
 
+    /// <summary>
+    /// 外层框架底板色。
+    /// </summary>
+    [SerializeField] private Color frameCoreColor = new Color(0.04f, 0.06f, 0.09f, 0.92f);
+
+    /// <summary>
+    /// 内层信息底板色。
+    /// </summary>
+    [SerializeField] private Color frameInsetColor = new Color(0.03f, 0.05f, 0.08f, 0.96f);
+
+    /// <summary>
+    /// 主标题颜色。
+    /// </summary>
+    [SerializeField] private Color titleColor = Color.white;
+
+    /// <summary>
+    /// 副标题颜色。
+    /// </summary>
+    [SerializeField] private Color subtitleColor = new Color(0.78f, 0.86f, 0.94f, 1f);
+
+    /// <summary>
+    /// 正文说明颜色。
+    /// </summary>
+    [SerializeField] private Color descriptionColor = new Color(0.82f, 0.88f, 0.95f, 1f);
+
+    /// <summary>
+    /// 小提示颜色。
+    /// </summary>
+    [SerializeField] private Color hintColor = new Color(1f, 0.82f, 0.6f, 1f);
+
+    /// <summary>
+    /// 开始按钮主文字颜色。
+    /// </summary>
+    [SerializeField] private Color startButtonPrimaryTextColor = Color.white;
+
+    /// <summary>
+    /// 开始按钮副文字颜色。
+    /// </summary>
+    [SerializeField] private Color startButtonSecondaryTextColor = new Color(0.76f, 0.86f, 0.95f, 1f);
+
+    /// <summary>
+    /// 左下角页脚文字颜色。
+    /// </summary>
+    [SerializeField] private Color footerLeftTextColor = new Color(0.31f, 0.86f, 0.96f, 0.95f);
+
+    /// <summary>
+    /// 右下角页脚文字颜色。
+    /// </summary>
+    [SerializeField] private Color footerRightTextColor = new Color(1f, 0.62f, 0.29f, 0.95f);
+
+    /// <summary>
+    /// 按钮不可用时的颜色。
+    /// </summary>
+    [SerializeField] private Color buttonDisabledColor = new Color(0.3f, 0.32f, 0.36f, 0.8f);
+
+    /// <summary>
+    /// 可选的背景 Sprite。
+    /// 如果你后续要用正式主菜单底图，可以直接从这里拖进来。
+    /// </summary>
+    [SerializeField] private Sprite backgroundSprite;
+
+    /// <summary>
+    /// 可选的外框 Sprite。
+    /// </summary>
+    [SerializeField] private Sprite frameCoreSprite;
+
+    /// <summary>
+    /// 可选的内框 Sprite。
+    /// </summary>
+    [SerializeField] private Sprite frameInsetSprite;
+
+    /// <summary>
+    /// 可选的开始按钮 Sprite。
+    /// </summary>
+    [SerializeField] private Sprite startButtonSprite;
+
+    /// <summary>
+    /// 主标题字体。
+    /// 如果为空，会回退到项目默认 TMP 字体。
+    /// </summary>
+    [SerializeField] private TMP_FontAsset titleFontAsset;
+
+    /// <summary>
+    /// 正文与按钮文字默认字体。
+    /// </summary>
+    [SerializeField] private TMP_FontAsset bodyFontAsset;
+
+    /// <summary>
+    /// 强调型标签字体，例如副标题和页脚。
+    /// </summary>
+    [SerializeField] private TMP_FontAsset accentFontAsset;
+
+    [Header("Text Copy")]
+
+    /// <summary>
+    /// 主标题文案。
+    /// 以后如果你想把首页名字换成自己的游戏名，直接改这里就可以。
+    /// </summary>
+    [SerializeField] private string titleCopy = "电量防线";
+
+    /// <summary>
+    /// 副标题文案。
+    /// </summary>
+    [SerializeField] private string subtitleCopy = "Power Grid Defense / Prototype Access Terminal";
+
+    /// <summary>
+    /// 页面正文说明。
+    /// </summary>
+    [SerializeField]
+    [TextArea(3, 8)]
+    private string descriptionCopy = "在这里进入当前塔防测试关卡。\n\n你将使用发电机与炮塔，在有限电量下沿部署网络逐步扩张防线。\n\n点击下方开始，即可切换到当前制作中的玩法场景。";
+
+    /// <summary>
+    /// 开始按钮上方提示。
+    /// </summary>
+    [SerializeField] private string hintCopy = "START will load SampleScene directly";
+
+    /// <summary>
+    /// 开始按钮主文字。
+    /// </summary>
+    [SerializeField] private string startPrimaryCopy = "开始游戏";
+
+    /// <summary>
+    /// 开始按钮副文字。
+    /// </summary>
+    [SerializeField] private string startSecondaryCopy = "ENTER BATTLEFIELD / SAMPLE SCENE";
+
+    /// <summary>
+    /// 左侧页脚文案。
+    /// </summary>
+    [SerializeField] private string footerLeftCopy = "ENTRY NODE / MAIN MENU";
+
+    /// <summary>
+    /// 右侧页脚文案。
+    /// </summary>
+    [SerializeField] private string footerRightCopy = "Press Enter / Space or click Start";
+
     [Header("Scene UI Refs")]
 
     /// <summary>
@@ -205,6 +342,7 @@ public sealed class MainMenuController : MonoBehaviour
     private void OnEnable()
     {
         EnsureSceneObjects();
+        ApplyThemeAndCopyToBoundSceneObjects();
         BindStartButton();
     }
 
@@ -214,6 +352,17 @@ public sealed class MainMenuController : MonoBehaviour
     private void OnDisable()
     {
         UnbindStartButton();
+    }
+
+    /// <summary>
+    /// 当 Inspector 中的主题或文案变化时，尽量立刻同步到当前场景对象。
+    ///
+    /// 这样主菜单也能像 `SampleScene` 一样，越来越接近“在 Scene / Inspector 里直接改样式”的工作流。
+    /// </summary>
+    private void OnValidate()
+    {
+        EnsureSceneObjects();
+        ApplyThemeAndCopyToBoundSceneObjects();
     }
 
     /// <summary>
@@ -282,6 +431,7 @@ public sealed class MainMenuController : MonoBehaviour
         }
 
         ValidateBoundReferences();
+        ApplyThemeAndCopyToBoundSceneObjects();
     }
 
     /// <summary>
@@ -424,27 +574,27 @@ public sealed class MainMenuController : MonoBehaviour
         backgroundPanel = EnsureImage(canvasRect, BackgroundName, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1920f, 1080f), backgroundColor);
         backgroundPanel.raycastTarget = false;
 
-        frameCorePanel = EnsureImage(menuRoot, FrameCoreName, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1320f, 760f), new Color(0.04f, 0.06f, 0.09f, 0.92f));
-        frameInsetPanel = EnsureImage(menuRoot, FrameInsetName, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1256f, 696f), new Color(0.03f, 0.05f, 0.08f, 0.96f));
+        frameCorePanel = EnsureImage(menuRoot, FrameCoreName, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1320f, 760f), frameCoreColor);
+        frameInsetPanel = EnsureImage(menuRoot, FrameInsetName, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1256f, 696f), frameInsetColor);
 
-        titleText = EnsureText(menuRoot, TitleName, new Vector2(-304f, 168f), new Vector2(720f, 180f), 84f, FontStyles.Bold, Color.white, "电量防线", TextAlignmentOptions.Left);
+        titleText = EnsureText(menuRoot, TitleName, new Vector2(-304f, 168f), new Vector2(720f, 180f), 84f, FontStyles.Bold, titleColor, titleCopy, TextAlignmentOptions.Left, titleFontAsset);
         titleText.lineSpacing = -18f;
 
-        subtitleText = EnsureText(menuRoot, SubtitleName, new Vector2(-300f, 76f), new Vector2(760f, 92f), 28f, FontStyles.Bold, new Color(0.78f, 0.86f, 0.94f, 1f), "Power Grid Defense / Prototype Access Terminal", TextAlignmentOptions.Left);
+        subtitleText = EnsureText(menuRoot, SubtitleName, new Vector2(-300f, 76f), new Vector2(760f, 92f), 28f, FontStyles.Bold, subtitleColor, subtitleCopy, TextAlignmentOptions.Left, accentFontAsset);
         subtitleText.characterSpacing = 2f;
 
-        descriptionText = EnsureText(menuRoot, DescriptionName, new Vector2(-288f, -40f), new Vector2(760f, 180f), 26f, FontStyles.Normal, new Color(0.82f, 0.88f, 0.95f, 1f), "在这里进入当前塔防测试关卡。\n\n你将使用发电机与炮塔，在有限电量下沿部署网络逐步扩张防线。\n\n点击下方开始，即可切换到当前制作中的玩法场景。", TextAlignmentOptions.Left);
+        descriptionText = EnsureText(menuRoot, DescriptionName, new Vector2(-288f, -40f), new Vector2(760f, 180f), 26f, FontStyles.Normal, descriptionColor, descriptionCopy, TextAlignmentOptions.Left, bodyFontAsset);
         descriptionText.lineSpacing = 6f;
 
-        hintText = EnsureText(menuRoot, HintName, new Vector2(-284f, -214f), new Vector2(760f, 36f), 20f, FontStyles.Bold, new Color(1f, 0.82f, 0.6f, 1f), "START will load SampleScene directly", TextAlignmentOptions.Left);
+        hintText = EnsureText(menuRoot, HintName, new Vector2(-284f, -214f), new Vector2(760f, 36f), 20f, FontStyles.Bold, hintColor, hintCopy, TextAlignmentOptions.Left, accentFontAsset);
 
         startButton = EnsureButton(menuRoot, StartButtonName, new Vector2(344f, -28f), new Vector2(360f, 116f), primaryAccent);
         startButtonImage = startButton.GetComponent<Image>();
-        startButtonPrimaryText = EnsureText(startButton.transform as RectTransform, StartPrimaryName, new Vector2(24f, 12f), new Vector2(260f, 40f), 36f, FontStyles.Bold, Color.white, "开始游戏", TextAlignmentOptions.Left);
-        startButtonSecondaryText = EnsureText(startButton.transform as RectTransform, StartSecondaryName, new Vector2(24f, -22f), new Vector2(260f, 28f), 18f, FontStyles.Bold, new Color(0.76f, 0.86f, 0.95f, 1f), "ENTER BATTLEFIELD / SAMPLE SCENE", TextAlignmentOptions.Left);
+        startButtonPrimaryText = EnsureText(startButton.transform as RectTransform, StartPrimaryName, new Vector2(24f, 12f), new Vector2(260f, 40f), 36f, FontStyles.Bold, startButtonPrimaryTextColor, startPrimaryCopy, TextAlignmentOptions.Left, titleFontAsset);
+        startButtonSecondaryText = EnsureText(startButton.transform as RectTransform, StartSecondaryName, new Vector2(24f, -22f), new Vector2(260f, 28f), 18f, FontStyles.Bold, startButtonSecondaryTextColor, startSecondaryCopy, TextAlignmentOptions.Left, accentFontAsset);
 
-        footerLeftText = EnsureText(menuRoot, FooterLeftName, new Vector2(-334f, -322f), new Vector2(420f, 34f), 18f, FontStyles.Bold, new Color(secondaryAccent.r, secondaryAccent.g, secondaryAccent.b, 0.95f), "ENTRY NODE / MAIN MENU", TextAlignmentOptions.Left);
-        footerRightText = EnsureText(menuRoot, FooterRightName, new Vector2(310f, -322f), new Vector2(560f, 34f), 18f, FontStyles.Bold, new Color(primaryAccent.r, primaryAccent.g, primaryAccent.b, 0.95f), "Press Enter / Space or click Start", TextAlignmentOptions.Left);
+        footerLeftText = EnsureText(menuRoot, FooterLeftName, new Vector2(-334f, -322f), new Vector2(420f, 34f), 18f, FontStyles.Bold, footerLeftTextColor, footerLeftCopy, TextAlignmentOptions.Left, accentFontAsset);
+        footerRightText = EnsureText(menuRoot, FooterRightName, new Vector2(310f, -322f), new Vector2(560f, 34f), 18f, FontStyles.Bold, footerRightTextColor, footerRightCopy, TextAlignmentOptions.Left, accentFontAsset);
     }
 
     /// <summary>
@@ -488,6 +638,53 @@ public sealed class MainMenuController : MonoBehaviour
     }
 
     /// <summary>
+    /// 把当前 Inspector 里的主题和文案正式应用到已经存在的场景对象。
+    ///
+    /// 这里的边界很刻意：
+    /// - 会同步颜色、Sprite、字体和文案
+    /// - 不会重排你已经在 Scene 里调好的位置和尺寸
+    ///
+    /// 这样主菜单就更接近我们希望的目标：
+    /// “样式入口在 Inspector，布局入口在 Scene”。
+    /// </summary>
+    private void ApplyThemeAndCopyToBoundSceneObjects()
+    {
+        if (sceneCamera != null)
+        {
+            sceneCamera.backgroundColor = backgroundColor;
+        }
+
+        ApplyImageTheme(backgroundPanel, backgroundColor, backgroundSprite, preserveAspect: false);
+        ApplyImageTheme(frameCorePanel, frameCoreColor, frameCoreSprite, preserveAspect: false);
+        ApplyImageTheme(frameInsetPanel, frameInsetColor, frameInsetSprite, preserveAspect: false);
+        ApplyImageTheme(startButtonImage, primaryAccent, startButtonSprite, preserveAspect: false);
+
+        ApplyTextTheme(titleText, titleCopy, titleColor, titleFontAsset);
+        ApplyTextTheme(subtitleText, subtitleCopy, subtitleColor, accentFontAsset);
+        ApplyTextTheme(descriptionText, descriptionCopy, descriptionColor, bodyFontAsset);
+        ApplyTextTheme(hintText, hintCopy, hintColor, accentFontAsset);
+        ApplyTextTheme(startButtonPrimaryText, startPrimaryCopy, startButtonPrimaryTextColor, titleFontAsset);
+        ApplyTextTheme(startButtonSecondaryText, startSecondaryCopy, startButtonSecondaryTextColor, accentFontAsset);
+        ApplyTextTheme(footerLeftText, footerLeftCopy, footerLeftTextColor, accentFontAsset);
+        ApplyTextTheme(footerRightText, footerRightCopy, footerRightTextColor, accentFontAsset);
+
+        if (startButton != null)
+        {
+            startButton.targetGraphic = startButtonImage;
+
+            ColorBlock colors = startButton.colors;
+            colors.normalColor = primaryAccent;
+            colors.highlightedColor = Color.Lerp(primaryAccent, Color.white, 0.22f);
+            colors.pressedColor = Color.Lerp(primaryAccent, Color.black, 0.16f);
+            colors.selectedColor = colors.highlightedColor;
+            colors.disabledColor = buttonDisabledColor;
+            colors.colorMultiplier = 1f;
+            colors.fadeDuration = 0.08f;
+            startButton.colors = colors;
+        }
+    }
+
+    /// <summary>
     /// 主菜单现在走“显式场景装配”后，缺引用应该尽早暴露出来，
     /// 而不是继续靠隐式查找把问题藏住。
     /// </summary>
@@ -500,8 +697,13 @@ public sealed class MainMenuController : MonoBehaviour
 
         Debug.LogWarning($"MainMenuController 缺少场景引用：{fieldName}。请在 MainMenu 场景的 Inspector 中补齐。", this);
     }
-    private static TMP_FontAsset ResolveFontAsset()
+    private TMP_FontAsset ResolveFontAsset(TMP_FontAsset preferredFontAsset)
     {
+        if (preferredFontAsset != null)
+        {
+            return preferredFontAsset;
+        }
+
         if (TMP_Settings.defaultFontAsset != null)
         {
             return TMP_Settings.defaultFontAsset;
@@ -555,7 +757,7 @@ public sealed class MainMenuController : MonoBehaviour
     /// <summary>
     /// 创建或复用一个 TMP 文本。
     /// </summary>
-    private static TextMeshProUGUI EnsureText(RectTransform parent, string objectName, Vector2 anchoredPosition, Vector2 sizeDelta, float fontSize, FontStyles fontStyle, Color color, string text, TextAlignmentOptions alignment)
+    private TextMeshProUGUI EnsureText(RectTransform parent, string objectName, Vector2 anchoredPosition, Vector2 sizeDelta, float fontSize, FontStyles fontStyle, Color color, string text, TextAlignmentOptions alignment, TMP_FontAsset preferredFontAsset)
     {
         RectTransform rectTransform = EnsureRectTransform(parent, objectName, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), anchoredPosition, sizeDelta);
         TextMeshProUGUI label = rectTransform.GetComponent<TextMeshProUGUI>();
@@ -564,7 +766,7 @@ public sealed class MainMenuController : MonoBehaviour
             label = rectTransform.gameObject.AddComponent<TextMeshProUGUI>();
         }
 
-        label.font = ResolveFontAsset();
+        label.font = ResolveFontAsset(preferredFontAsset);
         label.text = text;
         label.fontSize = fontSize;
         label.fontStyle = fontStyle;
@@ -573,6 +775,38 @@ public sealed class MainMenuController : MonoBehaviour
         label.enableWordWrapping = true;
         label.raycastTarget = false;
         return label;
+    }
+
+    private void ApplyTextTheme(TextMeshProUGUI label, string text, Color color, TMP_FontAsset preferredFontAsset)
+    {
+        if (label == null)
+        {
+            return;
+        }
+
+        label.text = text;
+        label.color = color;
+        TMP_FontAsset resolvedFontAsset = ResolveFontAsset(preferredFontAsset);
+        if (resolvedFontAsset != null)
+        {
+            label.font = resolvedFontAsset;
+        }
+    }
+
+    private static void ApplyImageTheme(Image image, Color color, Sprite sprite, bool preserveAspect)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.color = color;
+        if (sprite != null)
+        {
+            image.sprite = sprite;
+        }
+
+        image.preserveAspect = preserveAspect && image.sprite != null;
     }
 
     /// <summary>

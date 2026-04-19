@@ -4,6 +4,58 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
+/// `PowerGridHudSnapshot` 是 HUD 需要看到的供电域摘要。
+///
+/// 这里故意不把整套继电器和塔对象直接暴露给 HUD，
+/// 而是收口成一份“读数结果”：
+/// - 现在有多少继电器。
+/// - 现在有多少战斗塔在线 / 离线。
+/// - 当前总负载和总供电量分别是多少。
+/// - 此刻最值得告诉玩家的一句供电状态提示是什么。
+///
+/// 这样做以后，HUD 只依赖稳定的数据快照，
+/// 不会反过来耦合供电判定过程里的内部容器和中间步骤。
+/// </summary>
+public readonly struct PowerGridHudSnapshot
+{
+    public PowerGridHudSnapshot(
+        int relayCount,
+        int relayLimit,
+        int totalTowerCount,
+        int poweredTowerCount,
+        int offlineTowerCount,
+        int assignedLoad,
+        int totalCapacity,
+        string statusMessage)
+    {
+        RelayCount = relayCount;
+        RelayLimit = relayLimit;
+        TotalTowerCount = totalTowerCount;
+        PoweredTowerCount = poweredTowerCount;
+        OfflineTowerCount = offlineTowerCount;
+        AssignedLoad = assignedLoad;
+        TotalCapacity = totalCapacity;
+        StatusMessage = statusMessage ?? string.Empty;
+    }
+
+    public int RelayCount { get; }
+
+    public int RelayLimit { get; }
+
+    public int TotalTowerCount { get; }
+
+    public int PoweredTowerCount { get; }
+
+    public int OfflineTowerCount { get; }
+
+    public int AssignedLoad { get; }
+
+    public int TotalCapacity { get; }
+
+    public string StatusMessage { get; }
+}
+
+/// <summary>
 /// Coordinates relay coverage, relay numbering, tower numbering, and runtime power allocation.
 /// The goal is to keep the phase-two power rules out of the main gameplay orchestrator.
 /// </summary>
@@ -107,6 +159,64 @@ public sealed class TowerPowerGridCoordinator
         }
 
         return bounds;
+    }
+
+    /// <summary>
+    /// 组装一份给 HUD 使用的供电摘要。
+    ///
+    /// 这一步的重点不是“再次参与供电判定”，
+    /// 而是把当前已经生效的结果翻译成玩家能快速读懂的局势信息。
+    /// </summary>
+    public PowerGridHudSnapshot GetHudSnapshot()
+    {
+        CollectRuntimeStructures(out List<RelayTower> relays, out List<DefenseTower> towers);
+
+        int relayCount = relays.Count;
+        int totalTowerCount = towers.Count;
+        int poweredTowerCount = towers.Count(tower => tower != null && tower.IsPowered);
+        int offlineTowerCount = Mathf.Max(0, totalTowerCount - poweredTowerCount);
+        int totalCapacity = relays.Sum(relay => relay != null ? relay.SupplyCapacity : 0);
+        int assignedLoad = relays.Sum(relay => relay != null ? relay.CurrentAssignedLoad : 0);
+
+        string statusMessage;
+        if (relayCount == 0)
+        {
+            statusMessage = totalTowerCount > 0
+                ? "No relay coverage is active. Deployed towers will stay offline."
+                : "Place a relay first to open the power network.";
+        }
+        else if (totalTowerCount == 0)
+        {
+            statusMessage = relayCount >= RelayLimit
+                ? "Relay network ready, but the relay limit is already full."
+                : "Relay network ready. Deploy combat towers inside relay coverage.";
+        }
+        else if (offlineTowerCount > 0)
+        {
+            statusMessage = $"{offlineTowerCount} tower(s) offline. Expand capacity or reposition the next build.";
+        }
+        else if (relayCount >= RelayLimit)
+        {
+            statusMessage = "All towers are powered. Further expansion now depends on upgrading existing relays.";
+        }
+        else if (totalCapacity > 0 && assignedLoad >= totalCapacity)
+        {
+            statusMessage = "Grid is saturated. New builds or upgrades may trip supply immediately.";
+        }
+        else
+        {
+            statusMessage = "Grid stable. Current relay capacity is covering all deployed towers.";
+        }
+
+        return new PowerGridHudSnapshot(
+            relayCount: relayCount,
+            relayLimit: RelayLimit,
+            totalTowerCount: totalTowerCount,
+            poweredTowerCount: poweredTowerCount,
+            offlineTowerCount: offlineTowerCount,
+            assignedLoad: assignedLoad,
+            totalCapacity: totalCapacity,
+            statusMessage: statusMessage);
     }
 
     public void RegisterPlacedStructure(GameObject structureObject, TowerType towerType)

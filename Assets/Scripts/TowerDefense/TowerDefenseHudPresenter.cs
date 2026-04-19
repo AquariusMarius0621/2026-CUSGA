@@ -4,6 +4,86 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
+/// `HudNoticeTone` 描述一条 HUD 反馈在视觉上应该偏向什么语气。
+///
+/// 这样做的意义是：
+/// - 玩法层继续只关心“发生了什么事”
+/// - HUD 层可以根据语气统一决定颜色层级
+///
+/// 以后如果要把同一套事件再接到别的 UI 元素上，
+/// 也能复用这一层“语气信息”，而不是重新猜每句文字该染成什么色。
+/// </summary>
+public enum HudNoticeTone
+{
+    Auto,
+    Neutral,
+    Positive,
+    Spending,
+    Warning,
+    Danger
+}
+
+/// <summary>
+/// `HudNoticeEntry` 是一条可被 HUD 展示的反馈记录。
+///
+/// 它同时带上：
+/// - 文案本身
+/// - 建议的视觉语气
+///
+/// 这让“事件是什么”和“怎么显示它”之间仍然保持一个很轻的解耦层。
+/// </summary>
+public readonly struct HudNoticeEntry
+{
+    public HudNoticeEntry(string message, HudNoticeTone tone)
+    {
+        Message = message ?? string.Empty;
+        Tone = ResolveTone(Message, tone);
+    }
+
+    public string Message { get; }
+
+    public HudNoticeTone Tone { get; }
+
+    public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
+
+    private static HudNoticeTone ResolveTone(string message, HudNoticeTone requestedTone)
+    {
+        if (requestedTone != HudNoticeTone.Auto)
+        {
+            return requestedTone;
+        }
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return HudNoticeTone.Neutral;
+        }
+
+        if (message.StartsWith("+", StringComparison.Ordinal))
+        {
+            return HudNoticeTone.Positive;
+        }
+
+        if (message.StartsWith("-", StringComparison.Ordinal))
+        {
+            return HudNoticeTone.Spending;
+        }
+
+        string normalized = message.ToLowerInvariant();
+        if (normalized.Contains("offline") || normalized.Contains("failed") || normalized.Contains("depleted"))
+        {
+            return HudNoticeTone.Danger;
+        }
+
+        if (normalized.Contains("blocked") || normalized.Contains("warning") || normalized.Contains("incoming"))
+        {
+            return HudNoticeTone.Warning;
+        }
+
+        return HudNoticeTone.Neutral;
+    }
+}
+
+/// <summary>
 /// `TowerDefenseHudState` 是 HUD 每次刷新时真正需要的最小状态快照。
 ///
 /// 这里刻意不把整个 `TowerDefenseGame` 直接暴露给 HUD，
@@ -29,7 +109,10 @@ public readonly struct TowerDefenseHudState
         bool isPlacementDragActive,
         TowerType dragTowerType,
         PlacedStructureHudState placedStructureState,
-        string transientNotice)
+        PowerGridHudSnapshot powerGridSnapshot,
+        string currentStatusMessage,
+        HudNoticeEntry transientNotice,
+        HudNoticeEntry[] recentHudNotices)
     {
         CurrentScrap = currentScrap;
         CurrentBaseHealth = currentBaseHealth;
@@ -39,7 +122,10 @@ public readonly struct TowerDefenseHudState
         IsPlacementDragActive = isPlacementDragActive;
         DragTowerType = dragTowerType;
         PlacedStructureState = placedStructureState;
-        TransientNotice = transientNotice ?? string.Empty;
+        PowerGridSnapshot = powerGridSnapshot;
+        CurrentStatusMessage = currentStatusMessage ?? string.Empty;
+        TransientNotice = transientNotice;
+        RecentHudNotices = recentHudNotices ?? Array.Empty<HudNoticeEntry>();
     }
 
     public int CurrentScrap { get; }
@@ -58,7 +144,13 @@ public readonly struct TowerDefenseHudState
 
     public PlacedStructureHudState PlacedStructureState { get; }
 
-    public string TransientNotice { get; }
+    public PowerGridHudSnapshot PowerGridSnapshot { get; }
+
+    public string CurrentStatusMessage { get; }
+
+    public HudNoticeEntry TransientNotice { get; }
+
+    public HudNoticeEntry[] RecentHudNotices { get; }
 }
 
 public readonly struct PlacedStructureHudState
@@ -103,6 +195,86 @@ public readonly struct TowerDragPreviewState
 }
 
 /// <summary>
+/// `TowerDefenseHudTheme` 是 HUD 运行时使用的轻量样式快照。
+///
+/// 这里刻意不把整个 UI 样式系统做得很重，
+/// 而是先把当前最常改、最容易写死在代码里的颜色入口收口起来。
+/// 这样后续你替换正式美术时：
+/// - 可以继续在 Scene 里改布局
+/// - 也可以通过 Inspector 改这一层的语义配色
+/// - 不需要去 Presenter 里翻很多硬编码字符串
+/// </summary>
+public readonly struct TowerDefenseHudTheme
+{
+    public TowerDefenseHudTheme(
+        Color metricLabelColor,
+        Color scrapValueColor,
+        Color baseValueColor,
+        Color waveValueColor,
+        Color cardTextColor,
+        Color secondaryInfoColor,
+        Color statusTextColor,
+        Color neutralNoticeColor,
+        Color positiveNoticeColor,
+        Color spendingNoticeColor,
+        Color warningNoticeColor,
+        Color dangerNoticeColor,
+        Color dragPreviewInfoColor,
+        Color dragPreviewValidColor,
+        Color dragPreviewInvalidColor)
+    {
+        MetricLabelColor = metricLabelColor;
+        ScrapValueColor = scrapValueColor;
+        BaseValueColor = baseValueColor;
+        WaveValueColor = waveValueColor;
+        CardTextColor = cardTextColor;
+        SecondaryInfoColor = secondaryInfoColor;
+        StatusTextColor = statusTextColor;
+        NeutralNoticeColor = neutralNoticeColor;
+        PositiveNoticeColor = positiveNoticeColor;
+        SpendingNoticeColor = spendingNoticeColor;
+        WarningNoticeColor = warningNoticeColor;
+        DangerNoticeColor = dangerNoticeColor;
+        DragPreviewInfoColor = dragPreviewInfoColor;
+        DragPreviewValidColor = dragPreviewValidColor;
+        DragPreviewInvalidColor = dragPreviewInvalidColor;
+    }
+
+    public Color MetricLabelColor { get; }
+    public Color ScrapValueColor { get; }
+    public Color BaseValueColor { get; }
+    public Color WaveValueColor { get; }
+    public Color CardTextColor { get; }
+    public Color SecondaryInfoColor { get; }
+    public Color StatusTextColor { get; }
+    public Color NeutralNoticeColor { get; }
+    public Color PositiveNoticeColor { get; }
+    public Color SpendingNoticeColor { get; }
+    public Color WarningNoticeColor { get; }
+    public Color DangerNoticeColor { get; }
+    public Color DragPreviewInfoColor { get; }
+    public Color DragPreviewValidColor { get; }
+    public Color DragPreviewInvalidColor { get; }
+
+    public static TowerDefenseHudTheme Default => new TowerDefenseHudTheme(
+        metricLabelColor: new Color(0.56f, 0.66f, 0.75f, 1f),
+        scrapValueColor: new Color(1f, 0.71f, 0.4f, 1f),
+        baseValueColor: new Color(0.45f, 0.91f, 1f, 1f),
+        waveValueColor: new Color(1f, 0.85f, 0.47f, 1f),
+        cardTextColor: new Color(0.96f, 0.98f, 1f, 1f),
+        secondaryInfoColor: new Color(0.54f, 0.65f, 0.75f, 1f),
+        statusTextColor: new Color(0.84f, 0.9f, 0.94f, 1f),
+        neutralNoticeColor: new Color(0.81f, 0.88f, 0.92f, 1f),
+        positiveNoticeColor: new Color(0.49f, 0.95f, 0.69f, 1f),
+        spendingNoticeColor: new Color(1f, 0.85f, 0.47f, 1f),
+        warningNoticeColor: new Color(1f, 0.72f, 0.44f, 1f),
+        dangerNoticeColor: new Color(1f, 0.55f, 0.5f, 1f),
+        dragPreviewInfoColor: new Color(0.53f, 0.65f, 0.74f, 1f),
+        dragPreviewValidColor: new Color(0.47f, 0.95f, 0.85f, 1f),
+        dragPreviewInvalidColor: new Color(1f, 0.45f, 0.51f, 1f));
+}
+
+/// <summary>
 /// `TowerDefenseHudPresenter` 负责把玩法层结果写进当前场景里的 HUD。
 ///
 /// 这个类现在遵循“场景主导布局、脚本主导动态内容”的边界：
@@ -114,6 +286,8 @@ public readonly struct TowerDragPreviewState
 /// </summary>
 public sealed class TowerDefenseHudPresenter
 {
+    private TowerDefenseHudTheme _theme = TowerDefenseHudTheme.Default;
+
     private TMP_Text _scrapText;
     private TMP_Text _baseHealthText;
     private TMP_Text _waveText;
@@ -135,6 +309,17 @@ public sealed class TowerDefenseHudPresenter
     private Button _clearSelectionButton;
     private GameObject _gameOverPanel;
     private GameObject _dragPreviewPanel;
+
+    /// <summary>
+    /// 由总控把 HUD 主题快照注入进来。
+    ///
+    /// 这样 Presenter 继续只负责“如何显示”，
+    /// 而主题长什么样则回到更适合作者调整的 Inspector 入口。
+    /// </summary>
+    public void SetTheme(TowerDefenseHudTheme theme)
+    {
+        _theme = theme;
+    }
 
     /// <summary>
     /// 由外部把已经在 Inspector 里拖好的 HUD 引用直接注入进来。
@@ -303,14 +488,15 @@ public sealed class TowerDefenseHudPresenter
     /// </summary>
     public void ConfigureCardLabels(TowerCatalog towerCatalog)
     {
-        ConfigureTowerCardLabel(_relayTowerButtonText, towerCatalog.GetDefinition(TowerType.Relay));
-        ConfigureTowerCardLabel(_defenseTowerButtonText, towerCatalog.GetDefinition(TowerType.SingleTarget));
-        ConfigureTowerCardLabel(_slowFieldTowerButtonText, towerCatalog.GetDefinition(TowerType.SlowField));
-        ConfigureTowerCardLabel(_bombardTowerButtonText, towerCatalog.GetDefinition(TowerType.Bombard));
+        ConfigureTowerCard(_relayTowerButton, _relayTowerButtonText, towerCatalog.GetDefinition(TowerType.Relay));
+        ConfigureTowerCard(_defenseTowerButton, _defenseTowerButtonText, towerCatalog.GetDefinition(TowerType.SingleTarget));
+        ConfigureTowerCard(_slowFieldTowerButton, _slowFieldTowerButtonText, towerCatalog.GetDefinition(TowerType.SlowField));
+        ConfigureTowerCard(_bombardTowerButton, _bombardTowerButtonText, towerCatalog.GetDefinition(TowerType.Bombard));
 
         if (_clearSelectionButtonText != null)
         {
-            _clearSelectionButtonText.text = "CANCEL DEPLOY\n<size=20><color=#A4B2C0>Esc / RMB</color></size>";
+            string secondaryHex = ColorUtility.ToHtmlStringRGB(_theme.SecondaryInfoColor);
+            _clearSelectionButtonText.text = $"CANCEL DEPLOY\n<size=20><color=#{secondaryHex}>Esc / RMB</color></size>";
             _clearSelectionButtonText.alignment = TextAlignmentOptions.Center;
         }
     }
@@ -326,18 +512,18 @@ public sealed class TowerDefenseHudPresenter
     {
         if (_scrapText != null)
         {
-            _scrapText.text = BuildMetricText("SCRAP STOCK", state.CurrentScrap.ToString(), "FFB567");
+            _scrapText.text = BuildMetricText("SCRAP STOCK", state.CurrentScrap.ToString(), _theme.ScrapValueColor);
         }
 
         if (_baseHealthText != null)
         {
-            _baseHealthText.text = BuildMetricText("BASE CORE", state.CurrentBaseHealth.ToString(), "72E8FF");
+            _baseHealthText.text = BuildMetricText("BASE CORE", state.CurrentBaseHealth.ToString(), _theme.BaseValueColor);
         }
 
         if (_waveText != null)
         {
             string waveDisplay = state.TotalWaves > 0 ? $"{state.CurrentWave}/{state.TotalWaves}" : "0/0";
-            _waveText.text = BuildMetricText("WAVE CLOCK", waveDisplay, "FFD878");
+            _waveText.text = BuildMetricText("WAVE CLOCK", waveDisplay, _theme.WaveValueColor);
         }
 
         if (_selectionText != null)
@@ -408,15 +594,18 @@ public sealed class TowerDefenseHudPresenter
         }
 
         string accentHex = ColorUtility.ToHtmlStringRGB(definition.AccentColor);
+        string infoHex = ColorUtility.ToHtmlStringRGB(_theme.DragPreviewInfoColor);
+        string validHex = ColorUtility.ToHtmlStringRGB(_theme.DragPreviewValidColor);
+        string invalidHex = ColorUtility.ToHtmlStringRGB(_theme.DragPreviewInvalidColor);
         string stateLine = previewState.IsValid
-            ? "<color=#78F3DA>DROP POINT CONFIRMED</color>"
-            : $"<color=#FF7282>{previewState.InvalidReason}</color>";
+            ? $"<color=#{validHex}>DROP POINT CONFIRMED</color>"
+            : $"<color=#{invalidHex}>{previewState.InvalidReason}</color>";
 
         _dragPreviewLabel.text =
-            "<size=20><color=#97B2C8>DEPLOY TRACE</color></size>\n" +
+            $"<size=20><color=#{infoHex}>DEPLOY TRACE</color></size>\n" +
             $"<size=34>{definition.DisplayName.ToUpperInvariant()}</size>\n" +
-            $"<size=20><color=#{accentHex}>{definition.BuildCostLabel}</color>  <color=#88A5BC>GRID {definition.ExpansionSquareSize:0.0}</color></size>\n" +
-            "<size=18><color=#87A5BD>Cyan sectors show exact legal drop zones</color></size>\n" +
+            $"<size=20><color=#{accentHex}>{definition.BuildCostLabel}</color>  <color=#{infoHex}>GRID {definition.ExpansionSquareSize:0.0}</color></size>\n" +
+            $"<size=18><color=#{infoHex}>Cyan sectors show exact legal drop zones</color></size>\n" +
             $"<size=18>{stateLine}</size>";
     }
 
@@ -459,20 +648,29 @@ public sealed class TowerDefenseHudPresenter
     /// 只是为了确保多行卡片文案在当前卡片里能稳定读清楚。
     /// 但它不会再去改按钮位置、父物体布局或整个右侧区结构。
     /// </summary>
-    private void ConfigureTowerCardLabel(TMP_Text label, TowerDefinition definition)
+    private void ConfigureTowerCard(Button button, TMP_Text label, TowerDefinition definition)
     {
+        if (button != null)
+        {
+            TowerShopCard towerShopCard = button.GetComponent<TowerShopCard>();
+            if (towerShopCard != null)
+            {
+                towerShopCard.ApplyDefinitionVisuals(definition);
+            }
+        }
+
         if (label == null || definition == null)
         {
             return;
         }
 
-        label.text = definition.BuildCardLabelMarkup();
+        label.text = definition.BuildCardLabelMarkup(_theme.SecondaryInfoColor);
         label.alignment = TextAlignmentOptions.Left;
         label.margin = new Vector4(108f, 18f, 24f, 18f);
         label.enableWordWrapping = false;
         label.characterSpacing = 1.2f;
         label.lineSpacing = -10f;
-        label.color = new Color(0.96f, 0.98f, 1f, 1f);
+        label.color = _theme.CardTextColor;
     }
 
     /// <summary>
@@ -483,18 +681,41 @@ public sealed class TowerDefenseHudPresenter
     /// </summary>
     private string BuildSelectionText(TowerDefenseHudState state, TowerCatalog towerCatalog)
     {
+        string composedText = BuildPrimaryOperationBlock(state, towerCatalog);
+
+        AppendSection(ref composedText, BuildStatusBlock(state.CurrentStatusMessage));
+        AppendSection(ref composedText, BuildPowerGridBlock(state.PowerGridSnapshot));
+        AppendSection(ref composedText, BuildTransientNoticeBlock(state.TransientNotice));
+        AppendSection(ref composedText, BuildRecentNoticeBlock(state.RecentHudNotices, state.TransientNotice));
+
+        return composedText;
+    }
+
+    /// <summary>
+    /// 组装操作区的主说明块。
+    ///
+    /// 这里继续只表达“玩家眼前主要在做什么”：
+    /// - 正在拖拽哪种建筑
+    /// - 当前选中了哪张卡
+    /// - 当前选中了哪座已放下的结构
+    /// - 或者当前处于默认待命态
+    ///
+    /// 后面新增的供电摘要、实时状态和事件流，会作为独立区块拼接在后面，
+    /// 让信息层级比之前更清楚。
+    /// </summary>
+    private string BuildPrimaryOperationBlock(TowerDefenseHudState state, TowerCatalog towerCatalog)
+    {
         if (state.IsPlacementDragActive)
         {
             TowerDefinition draggingDefinition = towerCatalog.GetDefinition(state.DragTowerType);
             if (draggingDefinition != null)
             {
                 string accentHex = ColorUtility.ToHtmlStringRGB(draggingDefinition.AccentColor);
-                return AppendTransientNotice(
-                    baseText:
+                string secondaryHex = ColorUtility.ToHtmlStringRGB(_theme.SecondaryInfoColor);
+                return
                     "DEPLOY TRACE\n" +
                     $"<size=30>{draggingDefinition.DisplayName}</size>\n" +
-                    $"<size=20><color=#{accentHex}>{draggingDefinition.BuildCostLabel}</color>  <color=#89A7BF>Cyan sectors = exact legal zone</color></size>",
-                    transientNotice: state.TransientNotice);
+                    $"<size=20><color=#{accentHex}>{draggingDefinition.BuildCostLabel}</color>  <color=#{secondaryHex}>Cyan sectors = exact legal zone</color></size>";
             }
         }
 
@@ -505,67 +726,207 @@ public sealed class TowerDefenseHudPresenter
             {
                 string accentHex = ColorUtility.ToHtmlStringRGB(selectedDefinition.AccentColor);
                 string economyLine = BuildSelectionEconomyLine(state.CurrentScrap, selectedDefinition);
-                return AppendTransientNotice(
-                    baseText:
+                return
                     "TACTICAL READY\n" +
                     $"<size=30>{selectedDefinition.DisplayName}</size>\n" +
                     $"<size=20><color=#{accentHex}>{selectedDefinition.SelectionHint}</color></size>\n" +
                     $"<size=18><color=#8AA7BF>{selectedDefinition.UpgradeFocusSummary}</color></size>\n" +
-                    $"<size=18>{economyLine}</size>",
-                    transientNotice: state.TransientNotice);
+                    $"<size=18>{economyLine}</size>";
             }
         }
 
         if (state.PlacedStructureState.HasSelection)
         {
-            return AppendTransientNotice(
-                baseText:
+            string secondaryHex = ColorUtility.ToHtmlStringRGB(_theme.SecondaryInfoColor);
+            return
                 "STRUCTURE LINK\n" +
                 $"<size=30>{state.PlacedStructureState.Title}</size>\n" +
-                $"<size=18><color=#89A7BF>{state.PlacedStructureState.Details}</color></size>",
-                transientNotice: state.TransientNotice);
+                $"<size=18><color=#{secondaryHex}>{state.PlacedStructureState.Details}</color></size>";
         }
 
-        return AppendTransientNotice(
-            baseText:
+        string operationHintHex = ColorUtility.ToHtmlStringRGB(_theme.SecondaryInfoColor);
+        return
             "OPERATION LINK\n" +
             "<size=28>Click or drag a tower card to project legal sectors</size>\n" +
-            "<size=20><color=#89A7BF>1 Relay / 2 Single / 3 Slow / 4 Bomb / Esc Cancel</color></size>",
-            transientNotice: state.TransientNotice);
+            $"<size=20><color=#{operationHintHex}>1 Relay / 2 Single / 3 Slow / 4 Bomb / Esc Cancel</color></size>";
     }
 
-    private static string AppendTransientNotice(string baseText, string transientNotice)
+    /// <summary>
+    /// 当前状态行负责承接原来已经存在的 `SetStatusMessage()` 调用链。
+    ///
+    /// 这样一来：
+    /// - 旧代码不需要为了“没有 StatusStrip 了”而改得支离破碎
+    /// - 这些状态消息也不再丢失，而是正式落进操作区里
+    /// </summary>
+    private string BuildStatusBlock(string statusMessage)
     {
-        if (string.IsNullOrWhiteSpace(transientNotice))
+        if (string.IsNullOrWhiteSpace(statusMessage))
         {
-            return baseText;
+            return string.Empty;
         }
 
-        string accentColor = transientNotice.StartsWith("+", StringComparison.Ordinal)
-            ? "#7DF3B1"
-            : "#FFD878";
-        return $"{baseText}\n<size=18><color={accentColor}>{transientNotice}</color></size>";
+        string statusHex = ColorUtility.ToHtmlStringRGB(_theme.StatusTextColor);
+        return
+            "LIVE STATUS\n" +
+            $"<size=18><color=#{statusHex}>{EscapeRichText(statusMessage)}</color></size>";
     }
 
-    private static string BuildSelectionEconomyLine(int currentScrap, TowerDefinition definition)
+    /// <summary>
+    /// 把供电系统当前已经生效的结果翻译成一段可读摘要。
+    ///
+    /// 这样玩家在准备放塔、升级或排查断电时，
+    /// 不需要先点中特定继电器，也能先看到整局供电态势。
+    /// </summary>
+    private string BuildPowerGridBlock(PowerGridHudSnapshot snapshot)
+    {
+        string relayLimitText = snapshot.RelayLimit == int.MaxValue
+            ? "∞"
+            : snapshot.RelayLimit.ToString();
+
+        Color statusColor = snapshot.OfflineTowerCount > 0
+            ? _theme.DangerNoticeColor
+            : snapshot.RelayCount == 0
+                ? _theme.WarningNoticeColor
+                : _theme.PositiveNoticeColor;
+        string statusHex = ColorUtility.ToHtmlStringRGB(statusColor);
+        string infoHex = ColorUtility.ToHtmlStringRGB(_theme.SecondaryInfoColor);
+
+        return
+            "POWER GRID\n" +
+            $"<size=18><color=#{infoHex}>Relays {snapshot.RelayCount}/{relayLimitText}  Towers {snapshot.PoweredTowerCount}/{snapshot.TotalTowerCount} online</color></size>\n" +
+            $"<size=18><color=#{infoHex}>Load {snapshot.AssignedLoad}/{snapshot.TotalCapacity}</color></size>\n" +
+            $"<size=18><color=#{statusHex}>{EscapeRichText(snapshot.StatusMessage)}</color></size>";
+    }
+
+    /// <summary>
+    /// 最新一条瞬时提示会以更醒目的方式单独展示。
+    ///
+    /// 这样资源增减、关键警告或波次提示不会淹没在长说明文本里，
+    /// 玩家扫一眼就能知道刚刚发生了什么。
+    /// </summary>
+    private string BuildTransientNoticeBlock(HudNoticeEntry transientNotice)
+    {
+        if (!transientNotice.HasMessage)
+        {
+            return string.Empty;
+        }
+
+        return
+            "LATEST EVENT\n" +
+            $"<size=18><color={GetNoticeColor(transientNotice.Tone)}>{EscapeRichText(transientNotice.Message)}</color></size>";
+    }
+
+    /// <summary>
+    /// 最近事件流会保留最近几条重要反馈，
+    /// 解决“瞬时提示一闪而过，玩家没看清就丢失”的问题。
+    /// </summary>
+    private string BuildRecentNoticeBlock(HudNoticeEntry[] notices, HudNoticeEntry transientNotice)
+    {
+        if (notices == null || notices.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        string lines = string.Empty;
+        int visibleCount = 0;
+
+        for (int i = 0; i < notices.Length; i++)
+        {
+            HudNoticeEntry notice = notices[i];
+            if (!notice.HasMessage)
+            {
+                continue;
+            }
+
+            if (transientNotice.HasMessage &&
+                notice.Message == transientNotice.Message &&
+                notice.Tone == transientNotice.Tone)
+            {
+                continue;
+            }
+
+            if (visibleCount > 0)
+            {
+                lines += "\n";
+            }
+
+            lines += $"<color={GetNoticeColor(notice.Tone)}>• {EscapeRichText(notice.Message)}</color>";
+            visibleCount++;
+        }
+
+        if (visibleCount == 0)
+        {
+            return string.Empty;
+        }
+
+        return
+            "RECENT LOG\n" +
+            $"<size=16>{lines}</size>";
+    }
+
+    private static void AppendSection(ref string composedText, string section)
+    {
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(composedText))
+        {
+            composedText += "\n\n";
+        }
+
+        composedText += section;
+    }
+
+    private static string EscapeRichText(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Replace("<", "&lt;").Replace(">", "&gt;");
+    }
+
+    private string GetNoticeColor(HudNoticeTone tone)
+    {
+        switch (tone)
+        {
+            case HudNoticeTone.Positive:
+                return $"#{ColorUtility.ToHtmlStringRGB(_theme.PositiveNoticeColor)}";
+            case HudNoticeTone.Spending:
+                return $"#{ColorUtility.ToHtmlStringRGB(_theme.SpendingNoticeColor)}";
+            case HudNoticeTone.Warning:
+                return $"#{ColorUtility.ToHtmlStringRGB(_theme.WarningNoticeColor)}";
+            case HudNoticeTone.Danger:
+                return $"#{ColorUtility.ToHtmlStringRGB(_theme.DangerNoticeColor)}";
+            default:
+                return $"#{ColorUtility.ToHtmlStringRGB(_theme.NeutralNoticeColor)}";
+        }
+    }
+
+    private string BuildSelectionEconomyLine(int currentScrap, TowerDefinition definition)
     {
         if (definition == null)
         {
             return string.Empty;
         }
 
+        string positiveHex = $"#{ColorUtility.ToHtmlStringRGB(_theme.PositiveNoticeColor)}";
+        string dangerHex = $"#{ColorUtility.ToHtmlStringRGB(_theme.DangerNoticeColor)}";
         if (definition.BuildCost <= 0)
         {
-            return "<color=#7DF3B1>FREE deploy. Scrap remains unchanged.</color>";
+            return $"<color={positiveHex}>FREE deploy. Scrap remains unchanged.</color>";
         }
 
         int remainingAfterBuild = currentScrap - definition.BuildCost;
         if (remainingAfterBuild >= 0)
         {
-            return $"<color=#7DF3B1>{remainingAfterBuild} SCRAP left after deploy.</color>";
+            return $"<color={positiveHex}>{remainingAfterBuild} SCRAP left after deploy.</color>";
         }
 
-        return $"<color=#FF7282>Need {-remainingAfterBuild} more SCRAP to deploy.</color>";
+        return $"<color={dangerHex}>Need {-remainingAfterBuild} more SCRAP to deploy.</color>";
     }
 
     /// <summary>
@@ -613,10 +974,12 @@ public sealed class TowerDefenseHudPresenter
     /// 卡片放哪、字号多大、外边距多少，应该主要由场景控制；
     /// 但每张卡内部标签和数值的层级关系，仍然适合由代码统一生成。
     /// </summary>
-    private static string BuildMetricText(string label, string value, string accentHex)
+    private string BuildMetricText(string label, string value, Color accentColor)
     {
+        string labelHex = ColorUtility.ToHtmlStringRGB(_theme.MetricLabelColor);
+        string accentHex = ColorUtility.ToHtmlStringRGB(accentColor);
         return
-            $"<size=18><color=#8EA8BE>{label}</color></size>\n" +
+            $"<size=18><color=#{labelHex}>{label}</color></size>\n" +
             $"<size=56><color=#{accentHex}>{value}</color></size>";
     }
 }

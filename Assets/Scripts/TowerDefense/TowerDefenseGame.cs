@@ -28,6 +28,83 @@ public enum TowerType
 public class TowerDefenseGame : MonoBehaviour
 {
     /// <summary>
+    /// `TowerPresentationAuthoring` 把“某种塔在 UI 和文案层该怎样被表现”收口成一组 Inspector 配置。
+    ///
+    /// 这样做以后，商店卡、HUD 操作区和后续更多界面都可以从同一份配置读样式，
+    /// 而不是继续把名字、摘要、强调色和图标散落在不同脚本里。
+    /// </summary>
+    [Serializable]
+    private sealed class TowerPresentationAuthoring
+    {
+        public string displayName = "Tower";
+        public string cardRoleSummary = "Role Summary";
+        public string selectionHint = "Selection hint.";
+        public string upgradeFocusSummary = "Upgrade summary.";
+        public Color accentColor = Color.white;
+        public Sprite cardIconSprite = null;
+        public Color cardIconTint = Color.white;
+        public Color cardBackgroundTint = new Color(0.08f, 0.11f, 0.16f, 0.96f);
+        public Color cardAccentTint = Color.white;
+
+        public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? "Tower" : displayName;
+        public string CardRoleSummary => string.IsNullOrWhiteSpace(cardRoleSummary) ? DisplayName : cardRoleSummary;
+        public string SelectionHint => string.IsNullOrWhiteSpace(selectionHint) ? CardRoleSummary : selectionHint;
+        public string UpgradeFocusSummary => string.IsNullOrWhiteSpace(upgradeFocusSummary) ? "Upgrade improves this structure." : upgradeFocusSummary;
+        public Color AccentColor => accentColor;
+        public Sprite CardIconSprite => cardIconSprite;
+        public Color CardIconTint => cardIconTint;
+        public Color CardBackgroundTint => cardBackgroundTint;
+        public Color CardAccentTint => cardAccentTint;
+    }
+
+    /// <summary>
+    /// `HudThemeAuthoring` 把当前 HUD 仍然写死在代码里的主要配色收口到 Inspector。
+    ///
+    /// 这一步很重要，因为后面你替换正式美术时，
+    /// 最常改的往往就是这些“语义配色”和“文本层级颜色”，
+    /// 而不是 HUD 刷新逻辑本身。
+    /// </summary>
+    [Serializable]
+    private sealed class HudThemeAuthoring
+    {
+        [SerializeField] private Color metricLabelColor = new Color(0.56f, 0.66f, 0.75f, 1f);
+        [SerializeField] private Color scrapValueColor = new Color(1f, 0.71f, 0.4f, 1f);
+        [SerializeField] private Color baseValueColor = new Color(0.45f, 0.91f, 1f, 1f);
+        [SerializeField] private Color waveValueColor = new Color(1f, 0.85f, 0.47f, 1f);
+        [SerializeField] private Color cardTextColor = new Color(0.96f, 0.98f, 1f, 1f);
+        [SerializeField] private Color secondaryInfoColor = new Color(0.54f, 0.65f, 0.75f, 1f);
+        [SerializeField] private Color statusTextColor = new Color(0.84f, 0.9f, 0.94f, 1f);
+        [SerializeField] private Color neutralNoticeColor = new Color(0.81f, 0.88f, 0.92f, 1f);
+        [SerializeField] private Color positiveNoticeColor = new Color(0.49f, 0.95f, 0.69f, 1f);
+        [SerializeField] private Color spendingNoticeColor = new Color(1f, 0.85f, 0.47f, 1f);
+        [SerializeField] private Color warningNoticeColor = new Color(1f, 0.72f, 0.44f, 1f);
+        [SerializeField] private Color dangerNoticeColor = new Color(1f, 0.55f, 0.5f, 1f);
+        [SerializeField] private Color dragPreviewInfoColor = new Color(0.53f, 0.65f, 0.74f, 1f);
+        [SerializeField] private Color dragPreviewValidColor = new Color(0.47f, 0.95f, 0.85f, 1f);
+        [SerializeField] private Color dragPreviewInvalidColor = new Color(1f, 0.45f, 0.51f, 1f);
+
+        public TowerDefenseHudTheme ToRuntimeTheme()
+        {
+            return new TowerDefenseHudTheme(
+                metricLabelColor,
+                scrapValueColor,
+                baseValueColor,
+                waveValueColor,
+                cardTextColor,
+                secondaryInfoColor,
+                statusTextColor,
+                neutralNoticeColor,
+                positiveNoticeColor,
+                spendingNoticeColor,
+                warningNoticeColor,
+                dangerNoticeColor,
+                dragPreviewInfoColor,
+                dragPreviewValidColor,
+                dragPreviewInvalidColor);
+        }
+    }
+
+    /// <summary>
     /// 当前场景中的总控单例。部署卡、旧版 BuildPad 兼容桥和部分运行时对象会通过它拿到统一入口。
     /// </summary>
     public static TowerDefenseGame Instance { get; private set; }
@@ -54,6 +131,7 @@ public class TowerDefenseGame : MonoBehaviour
     [Header("Placement Preview")]
     [SerializeField] private Color validPreviewColor = new Color(0.26f, 0.95f, 0.78f, 0.72f);
     [SerializeField] private Color invalidPreviewColor = new Color(1f, 0.32f, 0.38f, 0.72f);
+    [SerializeField] private Sprite placementRingSpriteReference;
     [SerializeField] private string placementRingResourcePath = "UI/placement-ring";
 
     [Header("Placement Overlay")]
@@ -66,6 +144,55 @@ public class TowerDefenseGame : MonoBehaviour
     [SerializeField] private Color starterZoneMarkerFillColor = new Color(0.22f, 0.82f, 0.88f, 0.22f);
     [SerializeField] private Color starterZoneMarkerEdgeColor = new Color(0.9f, 1f, 0.98f, 1f);
     [SerializeField] private int starterZoneMarkerSortingOrder = 10;
+
+    [Header("Tower Presentation")]
+    [SerializeField] private TowerPresentationAuthoring relayPresentation = new TowerPresentationAuthoring
+    {
+        displayName = "Relay Generator",
+        cardRoleSummary = "Relay Node / Supply Grid",
+        selectionHint = "Anchor the power grid first, then expand tower coverage from there.",
+        upgradeFocusSummary = "Upgrades add more supply capacity without changing relay coverage radius.",
+        accentColor = new Color(1f, 0.55f, 0.22f, 1f),
+        cardIconTint = new Color(1f, 0.66f, 0.3f, 1f),
+        cardBackgroundTint = new Color(0.14f, 0.1f, 0.08f, 0.96f),
+        cardAccentTint = new Color(1f, 0.55f, 0.22f, 1f)
+    };
+    [SerializeField] private TowerPresentationAuthoring singleTargetPresentation = new TowerPresentationAuthoring
+    {
+        displayName = "Defense Turret",
+        cardRoleSummary = "Focus Fire / Frontline",
+        selectionHint = "Reliable direct damage for finishing one target at a time.",
+        upgradeFocusSummary = "Upgrades push faster fire, longer reach, and steadier single-target DPS.",
+        accentColor = new Color(0.28f, 0.78f, 1f, 1f),
+        cardIconTint = new Color(0.55f, 0.88f, 1f, 1f),
+        cardBackgroundTint = new Color(0.07f, 0.11f, 0.16f, 0.96f),
+        cardAccentTint = new Color(0.28f, 0.78f, 1f, 1f)
+    };
+    [SerializeField] private TowerPresentationAuthoring slowFieldPresentation = new TowerPresentationAuthoring
+    {
+        displayName = "Slow Field Tower",
+        cardRoleSummary = "Area Control / Slow",
+        selectionHint = "Controls lanes by slowing every enemy inside the field.",
+        upgradeFocusSummary = "Upgrades strengthen the slow, extend control time, and improve area denial.",
+        accentColor = new Color(0.36f, 0.95f, 0.84f, 1f),
+        cardIconTint = new Color(0.66f, 1f, 0.91f, 1f),
+        cardBackgroundTint = new Color(0.07f, 0.14f, 0.14f, 0.96f),
+        cardAccentTint = new Color(0.36f, 0.95f, 0.84f, 1f)
+    };
+    [SerializeField] private TowerPresentationAuthoring bombardPresentation = new TowerPresentationAuthoring
+    {
+        displayName = "Bombard Tower",
+        cardRoleSummary = "Burst Splash / Delayed",
+        selectionHint = "Delayed splash damage that punishes clustered enemies at range.",
+        upgradeFocusSummary = "Upgrades widen the blast, shorten bomb travel, and raise burst damage.",
+        accentColor = new Color(1f, 0.62f, 0.26f, 1f),
+        cardIconTint = new Color(1f, 0.78f, 0.46f, 1f),
+        cardBackgroundTint = new Color(0.16f, 0.1f, 0.08f, 0.96f),
+        cardAccentTint = new Color(1f, 0.62f, 0.26f, 1f)
+    };
+
+    [Header("HUD Theme")]
+    [SerializeField] private HudThemeAuthoring hudTheme = new HudThemeAuthoring();
 
     [Header("Scene References (Preferred)")]
 
@@ -320,7 +447,7 @@ public class TowerDefenseGame : MonoBehaviour
             return;
         }
 
-        ShowTransientHudNotice($"+{amount} SCRAP recovered.");
+        ShowTransientHudNotice($"+{amount} SCRAP recovered.", tone: HudNoticeTone.Positive);
         RefreshHud();
     }
 
@@ -345,6 +472,7 @@ public class TowerDefenseGame : MonoBehaviour
 
         RefreshHud();
         SetStatusMessage($"An enemy slipped through. Base lost {actualDamage} HP.");
+        ShowTransientHudNotice($"-{actualDamage} CORE integrity.", duration: 3f, tone: HudNoticeTone.Danger);
 
         if (baseDepleted)
         {
@@ -371,9 +499,9 @@ public class TowerDefenseGame : MonoBehaviour
         _presentationCoordinator?.SetStatusMessage(message);
     }
 
-    public void ShowTransientHudNotice(string message, float duration = 2.5f)
+    public void ShowTransientHudNotice(string message, float duration = 2.5f, HudNoticeTone tone = HudNoticeTone.Auto)
     {
-        _presentationCoordinator?.ShowTransientHudNotice(message, duration);
+        _presentationCoordinator?.ShowTransientHudNotice(message, duration, tone);
     }
 
     /// <summary>
@@ -456,7 +584,7 @@ public class TowerDefenseGame : MonoBehaviour
             _powerGridCoordinator.ApplyRelayUpgrade(_selectedRelayTower);
             SetStatusMessage(
                 $"Relay #{_selectedRelayTower.RelayNumber} upgraded to LV {_selectedRelayTower.CurrentLevel}. Capacity is now {_selectedRelayTower.SupplyCapacity}.");
-            ShowTransientHudNotice($"-{upgradeCost} SCRAP relay upgrade.", 2.2f);
+            ShowTransientHudNotice($"-{upgradeCost} SCRAP relay upgrade.", 2.2f, HudNoticeTone.Spending);
             InvalidatePlacementAreaOverlayCache();
             RefreshHud();
             return true;
@@ -479,7 +607,7 @@ public class TowerDefenseGame : MonoBehaviour
             _powerGridCoordinator.ApplyDefenseTowerUpgrade(_selectedDefenseTower);
             SetStatusMessage(
                 $"{GetTowerDisplayName(_selectedDefenseTower.BuildType)} #{_selectedDefenseTower.TowerNumber} upgraded to LV {_selectedDefenseTower.CurrentLevel}. Power demand is now {_selectedDefenseTower.PowerRequired}.");
-            ShowTransientHudNotice($"-{upgradeCost} SCRAP tower upgrade.", 2.2f);
+            ShowTransientHudNotice($"-{upgradeCost} SCRAP tower upgrade.", 2.2f, HudNoticeTone.Spending);
             RefreshHud();
             return true;
         }
@@ -556,44 +684,60 @@ public class TowerDefenseGame : MonoBehaviour
         _towerCatalog = new TowerCatalog(
             relayDefinition: new TowerDefinition(
                 towerType: TowerType.Relay,
-                displayName: "Relay Generator",
+                displayName: relayPresentation.DisplayName,
                 buildCost: relayTowerCost,
                 placementRadius: relayPlacementRadius,
                 expansionSquareSize: relayExpansionSquareSize,
-                cardRoleSummary: "Relay Node / Supply Grid",
-                selectionHint: "Anchor the power grid first, then expand tower coverage from there.",
-                upgradeFocusSummary: "Upgrades add more supply capacity without changing relay coverage radius.",
-                accentColor: new Color(1f, 0.55f, 0.22f, 1f)),
+                cardRoleSummary: relayPresentation.CardRoleSummary,
+                selectionHint: relayPresentation.SelectionHint,
+                upgradeFocusSummary: relayPresentation.UpgradeFocusSummary,
+                accentColor: relayPresentation.AccentColor,
+                cardIconSprite: relayPresentation.CardIconSprite,
+                cardIconTint: relayPresentation.CardIconTint,
+                cardBackgroundTint: relayPresentation.CardBackgroundTint,
+                cardAccentTint: relayPresentation.CardAccentTint),
             singleTargetDefinition: new TowerDefinition(
                 towerType: TowerType.SingleTarget,
-                displayName: "Defense Turret",
+                displayName: singleTargetPresentation.DisplayName,
                 buildCost: singleTargetTowerCost,
                 placementRadius: defensePlacementRadius,
                 expansionSquareSize: defenseExpansionSquareSize,
-                cardRoleSummary: "Focus Fire / Frontline",
-                selectionHint: "Reliable direct damage for finishing one target at a time.",
-                upgradeFocusSummary: "Upgrades push faster fire, longer reach, and steadier single-target DPS.",
-                accentColor: new Color(0.28f, 0.78f, 1f, 1f)),
+                cardRoleSummary: singleTargetPresentation.CardRoleSummary,
+                selectionHint: singleTargetPresentation.SelectionHint,
+                upgradeFocusSummary: singleTargetPresentation.UpgradeFocusSummary,
+                accentColor: singleTargetPresentation.AccentColor,
+                cardIconSprite: singleTargetPresentation.CardIconSprite,
+                cardIconTint: singleTargetPresentation.CardIconTint,
+                cardBackgroundTint: singleTargetPresentation.CardBackgroundTint,
+                cardAccentTint: singleTargetPresentation.CardAccentTint),
             slowFieldDefinition: new TowerDefinition(
                 towerType: TowerType.SlowField,
-                displayName: "Slow Field Tower",
+                displayName: slowFieldPresentation.DisplayName,
                 buildCost: slowFieldTowerCost,
                 placementRadius: defensePlacementRadius,
                 expansionSquareSize: defenseExpansionSquareSize,
-                cardRoleSummary: "Area Control / Slow",
-                selectionHint: "Controls lanes by slowing every enemy inside the field.",
-                upgradeFocusSummary: "Upgrades strengthen the slow, extend control time, and improve area denial.",
-                accentColor: new Color(0.36f, 0.95f, 0.84f, 1f)),
+                cardRoleSummary: slowFieldPresentation.CardRoleSummary,
+                selectionHint: slowFieldPresentation.SelectionHint,
+                upgradeFocusSummary: slowFieldPresentation.UpgradeFocusSummary,
+                accentColor: slowFieldPresentation.AccentColor,
+                cardIconSprite: slowFieldPresentation.CardIconSprite,
+                cardIconTint: slowFieldPresentation.CardIconTint,
+                cardBackgroundTint: slowFieldPresentation.CardBackgroundTint,
+                cardAccentTint: slowFieldPresentation.CardAccentTint),
             bombardDefinition: new TowerDefinition(
                 towerType: TowerType.Bombard,
-                displayName: "Bombard Tower",
+                displayName: bombardPresentation.DisplayName,
                 buildCost: bombardTowerCost,
                 placementRadius: defensePlacementRadius,
                 expansionSquareSize: defenseExpansionSquareSize,
-                cardRoleSummary: "Burst Splash / Delayed",
-                selectionHint: "Delayed splash damage that punishes clustered enemies at range.",
-                upgradeFocusSummary: "Upgrades widen the blast, shorten bomb travel, and raise burst damage.",
-                accentColor: new Color(1f, 0.62f, 0.26f, 1f)));
+                cardRoleSummary: bombardPresentation.CardRoleSummary,
+                selectionHint: bombardPresentation.SelectionHint,
+                upgradeFocusSummary: bombardPresentation.UpgradeFocusSummary,
+                accentColor: bombardPresentation.AccentColor,
+                cardIconSprite: bombardPresentation.CardIconSprite,
+                cardIconTint: bombardPresentation.CardIconTint,
+                cardBackgroundTint: bombardPresentation.CardBackgroundTint,
+                cardAccentTint: bombardPresentation.CardAccentTint));
 
         _placementRules = new TowerPlacementRules(
             towerType => _placementSupportCoordinator != null ? _placementSupportCoordinator.GetPlacementRadius(towerType) : 0.5f,
@@ -663,8 +807,12 @@ public class TowerDefenseGame : MonoBehaviour
             sessionStateQuery: () => _sessionState,
             interactionControllerQuery: () => _placementInteractionController,
             placedStructureHudStateQuery: BuildPlacedStructureHudState,
+            powerGridHudSnapshotQuery: () => _powerGridCoordinator != null
+                ? _powerGridCoordinator.GetHudSnapshot()
+                : new PowerGridHudSnapshot(0, 0, 0, 0, 0, 0, 0, string.Empty),
             canAffordTower: CanAffordTower,
             refreshStarterZoneMarker: () => _placementSupportCoordinator?.RefreshStarterZoneMarker());
+        _hudPresenter.SetTheme(hudTheme.ToRuntimeTheme());
         _presentationCoordinator.BindPresentation(_hudPresenter, _towerCatalog);
         _sceneBootstrapper = new TowerDefenseSceneBootstrapper();
     }
@@ -679,6 +827,7 @@ public class TowerDefenseGame : MonoBehaviour
         _placementVisualController?.Dispose();
 
         _placementVisualController = new TowerPlacementVisualController(
+            placementRingSpriteReference,
             placementRingResourcePath,
             validPreviewColor,
             invalidPreviewColor,

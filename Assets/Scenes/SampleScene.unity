@@ -1042,7 +1042,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 198271667}
-  - component: {fileID: 198271666}
   - component: {fileID: 198271668}
   m_Layer: 0
   m_Name: EnemyPrototype
@@ -1051,13 +1050,86 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
---- !u!212 &198271666
-SpriteRenderer:
+--- !u!4 &198271667
+Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 198271665}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.85, y: 0.85, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2119100001}
+  - {fileID: 1166943926}
+  m_Father: {fileID: 1407558902}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &198271668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 198271665}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3689b0da1a637804ea9c2fc44d86aa57, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  reachWaypointDistance: 0.05
+  bodyRendererReference: {fileID: 2119100002}
+  visualScaleRootReference: {fileID: 2119100001}
+  bodyColor: {r: 0.9, g: 0.25, b: 0.25, a: 1}
+  healthBarFillColor: {r: 0.2, g: 0.9, b: 0.35, a: 1}
+  healthBarBackgroundColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  healthBarFillSpriteOverride: {fileID: 0}
+  healthBarBackgroundSpriteOverride: {fileID: 0}
+  healthBarRootReference: {fileID: 1166943926}
+  healthBarFillReference: {fileID: 477070562}
+  healthBarFillRendererReference: {fileID: 477070561}
+  healthBarBackgroundRendererReference: {fileID: 626660988}
+--- !u!1 &2119100000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2119100001}
+  - component: {fileID: 2119100002}
+  m_Layer: 0
+  m_Name: VisualScaleRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2119100001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119100000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 198271667}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &2119100002
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119100000}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -1103,42 +1175,6 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!4 &198271667
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 198271665}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.85, y: 0.85, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1166943926}
-  m_Father: {fileID: 1407558902}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &198271668
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 198271665}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3689b0da1a637804ea9c2fc44d86aa57, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  reachWaypointDistance: 0.05
-  bodyColor: {r: 0.9, g: 0.25, b: 0.25, a: 1}
-  healthBarFillColor: {r: 0.2, g: 0.9, b: 0.35, a: 1}
-  healthBarBackgroundColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
-  healthBarRootReference: {fileID: 1166943926}
-  healthBarFillReference: {fileID: 477070562}
-  healthBarFillRendererReference: {fileID: 477070561}
-  healthBarBackgroundRendererReference: {fileID: 626660988}
 --- !u!1 &203997008
 GameObject:
   m_ObjectHideFlags: 0
@@ -1281,6 +1317,11 @@ MonoBehaviour:
   hoverScaleMultiplier: 1.035
   hoverPulseSpeed: 4.2
   hoverPulseAmplitude: 0.02
+  backgroundImageReference: {fileID: 203997011}
+  iconImageReference: {fileID: 90703277}
+  accentGraphicReferences:
+  - {fileID: 128532571}
+  - {fileID: 1415441122}
 --- !u!1 &265635448
 GameObject:
   m_ObjectHideFlags: 0
@@ -1551,11 +1592,68 @@ MonoBehaviour:
   initialPlacementSquareSize: 3
   validPreviewColor: {r: 0.26, g: 0.95, b: 0.78, a: 0.72}
   invalidPreviewColor: {r: 1, g: 0.32, b: 0.38, a: 0.72}
+  placementRingSpriteReference: {fileID: 21300000, guid: 6ac0fcb3f4030db4a8b4a0b263004f40, type: 3}
   placementRingResourcePath: UI/placement-ring
   placementAreaOverlayPixelsPerUnit: 20
   placementAreaOverlayFillColor: {r: 0.18, g: 0.82, b: 0.86, a: 0.16}
   placementAreaOverlayEdgeColor: {r: 0.72, g: 1, b: 0.97, a: 0.52}
   placementAreaOverlaySortingOrder: 12
+  relayPresentation:
+    displayName: Relay Generator
+    cardRoleSummary: Relay Node / Supply Grid
+    selectionHint: Anchor the power grid first, then expand tower coverage from there.
+    upgradeFocusSummary: Upgrades add more supply capacity without changing relay coverage radius.
+    accentColor: {r: 1, g: 0.55, b: 0.22, a: 1}
+    cardIconSprite: {fileID: 21300000, guid: a26e952e9ea3730489ce7c301b1893f6, type: 3}
+    cardIconTint: {r: 1, g: 0.66, b: 0.3, a: 1}
+    cardBackgroundTint: {r: 0.14, g: 0.1, b: 0.08, a: 0.96}
+    cardAccentTint: {r: 1, g: 0.55, b: 0.22, a: 1}
+  singleTargetPresentation:
+    displayName: Defense Turret
+    cardRoleSummary: Focus Fire / Frontline
+    selectionHint: Reliable direct damage for finishing one target at a time.
+    upgradeFocusSummary: Upgrades push faster fire, longer reach, and steadier single-target DPS.
+    accentColor: {r: 0.28, g: 0.78, b: 1, a: 1}
+    cardIconSprite: {fileID: 21300000, guid: 542c32817b144f54481e87920b1273d7, type: 3}
+    cardIconTint: {r: 0.55, g: 0.88, b: 1, a: 1}
+    cardBackgroundTint: {r: 0.07, g: 0.11, b: 0.16, a: 0.96}
+    cardAccentTint: {r: 0.28, g: 0.78, b: 1, a: 1}
+  slowFieldPresentation:
+    displayName: Slow Field Tower
+    cardRoleSummary: Area Control / Slow
+    selectionHint: Controls lanes by slowing every enemy inside the field.
+    upgradeFocusSummary: Upgrades strengthen the slow, extend control time, and improve area denial.
+    accentColor: {r: 0.36, g: 0.95, b: 0.84, a: 1}
+    cardIconSprite: {fileID: 0}
+    cardIconTint: {r: 0.66, g: 1, b: 0.91, a: 1}
+    cardBackgroundTint: {r: 0.07, g: 0.14, b: 0.14, a: 0.96}
+    cardAccentTint: {r: 0.36, g: 0.95, b: 0.84, a: 1}
+  bombardPresentation:
+    displayName: Bombard Tower
+    cardRoleSummary: Burst Splash / Delayed
+    selectionHint: Delayed splash damage that punishes clustered enemies at range.
+    upgradeFocusSummary: Upgrades widen the blast, shorten bomb travel, and raise burst damage.
+    accentColor: {r: 1, g: 0.62, b: 0.26, a: 1}
+    cardIconSprite: {fileID: 0}
+    cardIconTint: {r: 1, g: 0.78, b: 0.46, a: 1}
+    cardBackgroundTint: {r: 0.16, g: 0.1, b: 0.08, a: 0.96}
+    cardAccentTint: {r: 1, g: 0.62, b: 0.26, a: 1}
+  hudTheme:
+    metricLabelColor: {r: 0.56, g: 0.66, b: 0.75, a: 1}
+    scrapValueColor: {r: 1, g: 0.71, b: 0.4, a: 1}
+    baseValueColor: {r: 0.45, g: 0.91, b: 1, a: 1}
+    waveValueColor: {r: 1, g: 0.85, b: 0.47, a: 1}
+    cardTextColor: {r: 0.96, g: 0.98, b: 1, a: 1}
+    secondaryInfoColor: {r: 0.54, g: 0.65, b: 0.75, a: 1}
+    statusTextColor: {r: 0.84, g: 0.9, b: 0.94, a: 1}
+    neutralNoticeColor: {r: 0.81, g: 0.88, b: 0.92, a: 1}
+    positiveNoticeColor: {r: 0.49, g: 0.95, b: 0.69, a: 1}
+    spendingNoticeColor: {r: 1, g: 0.85, b: 0.47, a: 1}
+    warningNoticeColor: {r: 1, g: 0.72, b: 0.44, a: 1}
+    dangerNoticeColor: {r: 1, g: 0.55, b: 0.5, a: 1}
+    dragPreviewInfoColor: {r: 0.53, g: 0.65, b: 0.74, a: 1}
+    dragPreviewValidColor: {r: 0.47, g: 0.95, b: 0.85, a: 1}
+    dragPreviewInvalidColor: {r: 1, g: 0.45, b: 0.51, a: 1}
   mainCameraReference: {fileID: 519420031}
   relayTowerPrototypeReference: {fileID: 1548685746}
   defenseTowerPrototypeReference: {fileID: 1719944049}
@@ -8043,7 +8141,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1548685746}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -8100,7 +8198,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.9, y: 0.9, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2119200001}
   m_Father: {fileID: 1407558902}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1548685749
@@ -8122,9 +8221,95 @@ MonoBehaviour:
   maxLevel: 3
   upgradeCostBase: 16
   upgradeCostPerLevel: 12
+  visualRootReference: {fileID: 2119200001}
+  bodyRendererReference: {fileID: 2119200002}
   normalColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   saturatedColor: {r: 1, g: 0.5, b: 0.18, a: 1}
   gizmoColor: {r: 1, g: 0.78, b: 0.28, a: 0.8}
+--- !u!1 &2119200000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2119200001}
+  - component: {fileID: 2119200002}
+  m_Layer: 0
+  m_Name: VisualRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2119200001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119200000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1548685748}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &2119200002
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119200000}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
 --- !u!1 &1580717929
 GameObject:
   m_ObjectHideFlags: 0
@@ -9158,7 +9343,10 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.9, y: 0.9, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2119000001}
+  - {fileID: 2119000011}
+  - {fileID: 2119000021}
   m_Father: {fileID: 1407558902}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1719944052
@@ -9320,18 +9508,116 @@ MonoBehaviour:
     signatureVerticalBobSpeed: 3.1
   currentLevel: 1
   maxLevel: 3
+  bodyRendererReference: {fileID: 1719944050}
+  feedbackRootReference: {fileID: 2119000001}
+  typeSignatureRootReference: {fileID: 2119000011}
+  levelMarkerRootReference: {fileID: 2119000021}
   flashColor: {r: 1, g: 1, b: 1, a: 1}
   offlineColor: {r: 0.24, g: 0.28, b: 0.36, a: 1}
   flashDuration: 0.06
   upgradeFlashColor: {r: 1, g: 0.96, b: 0.68, a: 1}
   upgradePulseDuration: 0.18
   upgradeScaleMultiplier: 1.14
+  feedbackMaterial: {fileID: 0}
   levelPipSprite: {fileID: 0}
   levelPipColor: {r: 0.98, g: 0.96, b: 0.78, a: 1}
   levelPipOffset: {x: 0, y: -0.65}
   levelPipSpacing: 0.22
   levelPipScale: 0.12
   levelPipSortingOffset: 3
+--- !u!1 &2119000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2119000001}
+  m_Layer: 0
+  m_Name: FeedbackRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2119000001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1719944051}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2119000010
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2119000011}
+  m_Layer: 0
+  m_Name: TypeSignatureRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2119000011
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119000010}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1719944051}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2119000020
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2119000021}
+  m_Layer: 0
+  m_Name: LevelMarkerRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2119000021
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2119000020}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1719944051}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1729006010
 GameObject:
   m_ObjectHideFlags: 0
@@ -9608,6 +9894,13 @@ MonoBehaviour:
   hoverScaleMultiplier: 1.035
   hoverPulseSpeed: 4.2
   hoverPulseAmplitude: 0.02
+  backgroundImageReference: {fileID: 1735439457}
+  iconImageReference: {fileID: 312683310}
+  accentGraphicReferences:
+  - {fileID: 600772102}
+  - {fileID: 521548321}
+  - {fileID: 2038358398}
+  - {fileID: 1474045485}
 --- !u!1 &2100011001
 GameObject:
   m_ObjectHideFlags: 0
@@ -9750,6 +10043,9 @@ MonoBehaviour:
   hoverScaleMultiplier: 1.035
   hoverPulseSpeed: 4.2
   hoverPulseAmplitude: 0.02
+  backgroundImageReference: {fileID: 2100011004}
+  iconImageReference: {fileID: 2100011022}
+  accentGraphicReferences: []
 --- !u!1 &2100011010
 GameObject:
   m_ObjectHideFlags: 0
@@ -10236,6 +10532,9 @@ MonoBehaviour:
   hoverScaleMultiplier: 1.035
   hoverPulseSpeed: 4.2
   hoverPulseAmplitude: 0.02
+  backgroundImageReference: {fileID: 2100012004}
+  iconImageReference: {fileID: 2100012022}
+  accentGraphicReferences: []
 --- !u!1 &2100012010
 GameObject:
   m_ObjectHideFlags: 0

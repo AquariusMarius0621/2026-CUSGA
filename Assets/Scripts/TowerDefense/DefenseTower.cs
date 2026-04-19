@@ -182,6 +182,34 @@ public class DefenseTower : MonoBehaviour
     [SerializeField] private int currentLevel = 1;
     [SerializeField] private int maxLevel = 3;
 
+    [Header("Visual References")]
+
+    /// <summary>
+    /// 塔本体的主渲染器。
+    ///
+    /// 如果你后续把塔做成更复杂的层级，
+    /// 这里可以显式指定“哪一个 SpriteRenderer 才代表主塔身”。
+    /// </summary>
+    [SerializeField] private SpriteRenderer bodyRendererReference;
+
+    /// <summary>
+    /// 所有运行时反馈对象的挂点。
+    ///
+    /// 这样炸弹、爆炸、脉冲和 tracer 不会再默认挂到塔根节点上乱长，
+    /// 也更方便后续整体替换或隐藏这一层效果。
+    /// </summary>
+    [SerializeField] private Transform feedbackRootReference;
+
+    /// <summary>
+    /// 塔型签名的挂点。
+    /// </summary>
+    [SerializeField] private Transform typeSignatureRootReference;
+
+    /// <summary>
+    /// 等级标记的挂点。
+    /// </summary>
+    [SerializeField] private Transform levelMarkerRootReference;
+
     [Header("Shared Visuals")]
     [SerializeField] private Color flashColor = Color.white;
     [SerializeField] private Color offlineColor = new Color(0.24f, 0.28f, 0.36f, 1f);
@@ -189,6 +217,7 @@ public class DefenseTower : MonoBehaviour
     [SerializeField] private Color upgradeFlashColor = new Color(1f, 0.96f, 0.68f, 1f);
     [SerializeField] private float upgradePulseDuration = 0.18f;
     [SerializeField] private float upgradeScaleMultiplier = 1.14f;
+    [SerializeField] private Material feedbackMaterial;
 
     [Header("Level Marker")]
     [SerializeField] private Sprite levelPipSprite = null;
@@ -264,10 +293,23 @@ public class DefenseTower : MonoBehaviour
     /// </summary>
     private void Awake()
     {
-        _spriteRenderer = GetComponent<SpriteRenderer>();
+        _spriteRenderer = bodyRendererReference != null ? bodyRendererReference : GetComponent<SpriteRenderer>();
+        bodyRendererReference = _spriteRenderer;
         EnsureTypeSignatureRenderer();
         RefreshVisualState();
         RefreshLevelMarkerVisual();
+    }
+
+    /// <summary>
+    /// 在编辑器里尽量把最关键的视觉引用自动补齐。
+    /// 这样用户后续调整塔层级时，也更容易看清该拖哪些入口。
+    /// </summary>
+    private void OnValidate()
+    {
+        if (bodyRendererReference == null)
+        {
+            bodyRendererReference = GetComponent<SpriteRenderer>();
+        }
     }
 
     /// <summary>
@@ -830,7 +872,8 @@ public class DefenseTower : MonoBehaviour
             return;
         }
 
-        Transform existingTransform = transform.Find("TypeSignature");
+        Transform signatureParent = typeSignatureRootReference != null ? typeSignatureRootReference : transform;
+        Transform existingTransform = signatureParent.Find("TypeSignature");
         if (existingTransform != null)
         {
             _typeSignatureRenderer = existingTransform.GetComponent<SpriteRenderer>();
@@ -842,7 +885,7 @@ public class DefenseTower : MonoBehaviour
         }
 
         GameObject signatureObject = new GameObject("TypeSignature");
-        signatureObject.transform.SetParent(transform, false);
+        signatureObject.transform.SetParent(signatureParent, false);
         _typeSignatureRenderer = signatureObject.AddComponent<SpriteRenderer>();
     }
 
@@ -909,10 +952,11 @@ public class DefenseTower : MonoBehaviour
     private void EnsureLevelPipPool(int desiredCount)
     {
         desiredCount = Mathf.Max(0, desiredCount);
+        Transform levelMarkerParent = levelMarkerRootReference != null ? levelMarkerRootReference : transform;
         while (_levelPipRenderers.Count < desiredCount)
         {
             GameObject pipObject = new GameObject($"LevelPip_{_levelPipRenderers.Count + 1}");
-            pipObject.transform.SetParent(transform, false);
+            pipObject.transform.SetParent(levelMarkerParent, false);
             SpriteRenderer pipRenderer = pipObject.AddComponent<SpriteRenderer>();
             pipRenderer.sprite = levelPipSprite != null ? levelPipSprite : RuntimeFallbackSprite;
             _levelPipRenderers.Add(pipRenderer);
@@ -1006,7 +1050,14 @@ public class DefenseTower : MonoBehaviour
         SpriteRenderer feedbackRenderer = feedbackObject.AddComponent<SpriteRenderer>();
         feedbackRenderer.sprite = spriteToUse;
         feedbackRenderer.color = color;
+        if (feedbackMaterial != null)
+        {
+            feedbackRenderer.sharedMaterial = feedbackMaterial;
+        }
+
         feedbackRenderer.sortingOrder = (_spriteRenderer != null ? _spriteRenderer.sortingOrder : 0) + sortingOffset;
+        Transform feedbackParent = feedbackRootReference != null ? feedbackRootReference : transform;
+        feedbackObject.transform.SetParent(feedbackParent, false);
         feedbackObject.transform.position = transform.position;
         feedbackObject.transform.localScale = new Vector3(scale, scale, 1f);
         _activeFeedbackObjects.Add(feedbackObject);

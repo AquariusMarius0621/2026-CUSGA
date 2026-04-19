@@ -18,6 +18,7 @@ using UnityEngine;
 /// </summary>
 public sealed class TowerPlacementVisualController : IDisposable
 {
+    private readonly Sprite _placementRingSprite;
     private readonly string _placementRingResourcePath;
     private readonly Color _validPreviewColor;
     private readonly Color _invalidPreviewColor;
@@ -46,6 +47,7 @@ public sealed class TowerPlacementVisualController : IDisposable
     /// 2. 它仍然能复用总控里已经存在的塔目录、原型和规则参数。
     /// </summary>
     public TowerPlacementVisualController(
+        Sprite placementRingSprite,
         string placementRingResourcePath,
         Color validPreviewColor,
         Color invalidPreviewColor,
@@ -60,6 +62,7 @@ public sealed class TowerPlacementVisualController : IDisposable
         Func<TowerType, string> getTowerDisplayName,
         Func<TowerType, float> getPlacementRadius)
     {
+        _placementRingSprite = placementRingSprite;
         _placementRingResourcePath = placementRingResourcePath;
         _validPreviewColor = validPreviewColor;
         _invalidPreviewColor = invalidPreviewColor;
@@ -404,7 +407,12 @@ public sealed class TowerPlacementVisualController : IDisposable
     /// </summary>
     private void CreatePlacementRing(TowerType towerType)
     {
-        Sprite ringSprite = Resources.Load<Sprite>(_placementRingResourcePath);
+        Sprite ringSprite = _placementRingSprite;
+        if (ringSprite == null && !string.IsNullOrWhiteSpace(_placementRingResourcePath))
+        {
+            ringSprite = Resources.Load<Sprite>(_placementRingResourcePath);
+        }
+
         if (ringSprite == null)
         {
             return;

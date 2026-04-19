@@ -31,7 +31,11 @@ public sealed class TowerDefinition
         string cardRoleSummary,
         string selectionHint,
         string upgradeFocusSummary,
-        Color accentColor)
+        Color accentColor,
+        Sprite cardIconSprite,
+        Color cardIconTint,
+        Color cardBackgroundTint,
+        Color cardAccentTint)
     {
         TowerType = towerType;
         DisplayName = displayName;
@@ -42,6 +46,10 @@ public sealed class TowerDefinition
         SelectionHint = selectionHint;
         UpgradeFocusSummary = upgradeFocusSummary;
         AccentColor = accentColor;
+        CardIconSprite = cardIconSprite;
+        CardIconTint = cardIconTint;
+        CardBackgroundTint = cardBackgroundTint;
+        CardAccentTint = cardAccentTint;
     }
 
     /// <summary>
@@ -102,6 +110,30 @@ public sealed class TowerDefinition
     public Color AccentColor { get; }
 
     /// <summary>
+    /// 商店卡片使用的图标。
+    ///
+    /// 这样图标资源不再散落在场景和脚本的多个角落，
+    /// 而是跟着塔定义一起走。
+    /// </summary>
+    public Sprite CardIconSprite { get; }
+
+    /// <summary>
+    /// 卡片主图标的着色。
+    /// </summary>
+    public Color CardIconTint { get; }
+
+    /// <summary>
+    /// 卡片底板的主色。
+    /// 这能让不同塔型在 UI 上有更稳定的视觉分层。
+    /// </summary>
+    public Color CardBackgroundTint { get; }
+
+    /// <summary>
+    /// 卡片细节高亮色，例如边条、徽记或小装饰。
+    /// </summary>
+    public Color CardAccentTint { get; }
+
+    /// <summary>
     /// 统一格式化建造成本展示。
     /// 继电器免费时直接写成 `FREE`，比显示 `0 SCRAP` 更像正式规则文案。
     /// </summary>
@@ -114,12 +146,13 @@ public sealed class TowerDefinition
     /// 是为了让“卡片长什么样”跟着“塔定义”一起走，
     /// 避免 HUD 层又重新复制一套关于塔文案的分支逻辑。
     /// </summary>
-    public string BuildCardLabelMarkup()
+    public string BuildCardLabelMarkup(Color secondaryTextColor)
     {
-        string accentHex = ColorUtility.ToHtmlStringRGB(AccentColor);
+        string accentHex = ColorUtility.ToHtmlStringRGB(CardAccentTint);
+        string secondaryHex = ColorUtility.ToHtmlStringRGB(secondaryTextColor);
         return
             $"{DisplayName.ToUpperInvariant()}\n" +
-            $"<size=20><color=#9FB4C8>{CardRoleSummary} / GRID {ExpansionSquareSize:0.0}</color></size>\n" +
+            $"<size=20><color=#{secondaryHex}>{CardRoleSummary} / GRID {ExpansionSquareSize:0.0}</color></size>\n" +
             $"<size=32><color=#{accentHex}>{BuildCostLabel}</color></size>";
     }
 }

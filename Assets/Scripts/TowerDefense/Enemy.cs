@@ -55,6 +55,22 @@ public class Enemy : MonoBehaviour
     [Header("Body Look")]
 
     /// <summary>
+    /// 敌人本体的主渲染器。
+    ///
+    /// 如果后续敌人做成多层结构，
+    /// 这里可以显式指定哪一层代表“主体受击颜色反馈”。
+    /// </summary>
+    [SerializeField] private SpriteRenderer bodyRendererReference;
+
+    /// <summary>
+    /// 负责承载受击脉冲缩放的视觉根节点。
+    ///
+    /// 这样后续如果你想让血条或别的挂件不跟着一起缩放，
+    /// 就可以单独把这层指定到真正的敌人视觉根上。
+    /// </summary>
+    [SerializeField] private Transform visualScaleRootReference;
+
+    /// <summary>
     /// Base body color when the enemy is in a neutral state.
     /// </summary>
     [SerializeField] private Color bodyColor = new Color(0.9f, 0.25f, 0.25f, 1f);
@@ -87,6 +103,8 @@ public class Enemy : MonoBehaviour
     [Header("Health Bar Visuals")]
     [SerializeField] private Color healthBarFillColor = new Color(0.2f, 0.9f, 0.35f, 1f);
     [SerializeField] private Color healthBarBackgroundColor = new Color(0.15f, 0.15f, 0.15f, 1f);
+    [SerializeField] private Sprite healthBarFillSpriteOverride;
+    [SerializeField] private Sprite healthBarBackgroundSpriteOverride;
 
     [Header("Health Bar References")]
 
@@ -149,6 +167,16 @@ public class Enemy : MonoBehaviour
     /// </summary>
     private void OnValidate()
     {
+        if (bodyRendererReference == null)
+        {
+            bodyRendererReference = GetComponent<SpriteRenderer>();
+        }
+
+        if (visualScaleRootReference == null)
+        {
+            visualScaleRootReference = transform;
+        }
+
         if (healthBarFillReference != null && healthBarFillRendererReference == null)
         {
             healthBarFillRendererReference = healthBarFillReference.GetComponent<SpriteRenderer>();
@@ -158,7 +186,7 @@ public class Enemy : MonoBehaviour
     private void Awake()
     {
         CacheReferences();
-        _baseScale = transform.localScale;
+        _baseScale = (visualScaleRootReference != null ? visualScaleRootReference : transform).localScale;
         ApplyVisualTheme();
         RefreshBodyVisualState();
         SetHealthBarVisible(true);
@@ -184,7 +212,7 @@ public class Enemy : MonoBehaviour
     public void Initialize(EnemyPath path, float moveSpeed, int maxHealth, int scrapRewardOnDeath = 0)
     {
         CacheReferences();
-        _baseScale = transform.localScale;
+        _baseScale = (visualScaleRootReference != null ? visualScaleRootReference : transform).localScale;
         ApplyVisualTheme();
 
         _path = path;
@@ -342,7 +370,8 @@ public class Enemy : MonoBehaviour
     {
         if (_spriteRenderer == null)
         {
-            _spriteRenderer = GetComponent<SpriteRenderer>();
+            _spriteRenderer = bodyRendererReference != null ? bodyRendererReference : GetComponent<SpriteRenderer>();
+            bodyRendererReference = _spriteRenderer;
         }
 
         if (_healthBarRoot == null)
@@ -374,11 +403,21 @@ public class Enemy : MonoBehaviour
     {
         if (_healthBarFillRenderer != null)
         {
+            if (healthBarFillSpriteOverride != null)
+            {
+                _healthBarFillRenderer.sprite = healthBarFillSpriteOverride;
+            }
+
             _healthBarFillRenderer.color = healthBarFillColor;
         }
 
         if (_healthBarBackgroundRenderer != null)
         {
+            if (healthBarBackgroundSpriteOverride != null)
+            {
+                _healthBarBackgroundRenderer.sprite = healthBarBackgroundSpriteOverride;
+            }
+
             _healthBarBackgroundRenderer.color = healthBarBackgroundColor;
         }
     }
@@ -478,6 +517,7 @@ public class Enemy : MonoBehaviour
             pulseScale = 1f + Mathf.Sin(pulseProgress * Mathf.PI) * (_pulseScaleMultiplier - 1f);
         }
 
-        transform.localScale = _baseScale * pulseScale;
+        Transform scaleTarget = visualScaleRootReference != null ? visualScaleRootReference : transform;
+        scaleTarget.localScale = _baseScale * pulseScale;
     }
 }

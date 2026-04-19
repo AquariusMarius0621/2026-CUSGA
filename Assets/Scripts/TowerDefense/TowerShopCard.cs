@@ -46,6 +46,36 @@ public class TowerShopCard : MonoBehaviour,
     /// </summary>
     [SerializeField] private string hoverHint = "Drag the card to preview exact legal areas. Your first structure starts in the starter zone.";
 
+    [Header("Card Visual Refs")]
+
+    /// <summary>
+    /// 卡片底板。
+    ///
+    /// 这里优先支持显式 Inspector 引用；
+    /// 如果暂时没拖，脚本会先回退到按钮本体上的 `Image`。
+    /// </summary>
+    [SerializeField] private Image backgroundImageReference;
+
+    /// <summary>
+    /// 卡片主图标。
+    ///
+    /// 这让“卡片用什么图标”从场景零散子节点，变成一个更明确的替换入口。
+    /// </summary>
+    [SerializeField] private Image iconImageReference;
+
+    /// <summary>
+    /// 卡片上的强调图形。
+    ///
+    /// 常见情况包括：
+    /// - 左右细条
+    /// - 小徽记
+    /// - 分隔装饰
+    ///
+    /// 这些元素通常不需要逐个写逻辑，
+    /// 但它们的颜色最好能跟着塔定义统一切换。
+    /// </summary>
+    [SerializeField] private Graphic[] accentGraphicReferences = new Graphic[0];
+
     [Header("Drag Feedback")]
 
     /// <summary>
@@ -132,6 +162,15 @@ public class TowerShopCard : MonoBehaviour,
         }
 
         _originalScale = transform.localScale;
+        CacheVisualReferences();
+    }
+
+    /// <summary>
+    /// 编辑器里改层级或补引用后，也尽量把视觉引用自动整理一下。
+    /// </summary>
+    private void OnValidate()
+    {
+        CacheVisualReferences();
     }
 
     /// <summary>
@@ -429,6 +468,69 @@ public class TowerShopCard : MonoBehaviour,
     }
 
     /// <summary>
+    /// 根据塔定义应用卡片样式。
+    ///
+    /// 这一层的目标不是“强行重排 UI 布局”，
+    /// 而是把图标、底色和强调色从硬编码散点，
+    /// 收口成一个统一的入口。
+    /// </summary>
+    public void ApplyDefinitionVisuals(TowerDefinition definition)
+    {
+        if (definition == null)
+        {
+            return;
+        }
+
+        CacheVisualReferences();
+
+        if (backgroundImageReference != null)
+        {
+            backgroundImageReference.color = definition.CardBackgroundTint;
+        }
+
+        if (iconImageReference != null)
+        {
+            if (definition.CardIconSprite != null)
+            {
+                iconImageReference.sprite = definition.CardIconSprite;
+            }
+
+            iconImageReference.color = definition.CardIconTint;
+            iconImageReference.preserveAspect = true;
+        }
+
+        if (accentGraphicReferences != null)
+        {
+            for (int i = 0; i < accentGraphicReferences.Length; i++)
+            {
+                if (accentGraphicReferences[i] != null)
+                {
+                    accentGraphicReferences[i].color = definition.CardAccentTint;
+                }
+            }
+        }
+
+        Button button = GetComponent<Button>();
+        if (button != null)
+        {
+            ColorBlock colors = button.colors;
+            Color baseColor = definition.CardBackgroundTint;
+            Color accentColor = definition.CardAccentTint;
+            colors.normalColor = baseColor;
+            colors.highlightedColor = Color.Lerp(baseColor, accentColor, 0.18f);
+            colors.pressedColor = Color.Lerp(baseColor, Color.black, 0.16f);
+            colors.selectedColor = colors.highlightedColor;
+            colors.disabledColor = new Color(baseColor.r * 0.45f, baseColor.g * 0.45f, baseColor.b * 0.45f, 0.82f);
+            button.colors = colors;
+
+            if (backgroundImageReference != null)
+            {
+                button.targetGraphic = backgroundImageReference;
+            }
+        }
+    }
+
+    /// <summary>
     /// 恢复拖拽前的卡片视觉状态。
     /// </summary>
     private void RestoreVisualState()
@@ -440,5 +542,65 @@ public class TowerShopCard : MonoBehaviour,
         }
 
         transform.localScale = _originalScale;
+    }
+
+    /// <summary>
+    /// 把卡片视觉引用尽量收口成稳定入口。
+    ///
+    /// 显式 Inspector 引用仍然是首选；
+    /// 这里只在缺项时做一层轻量回填，避免老场景立刻全部失效。
+    /// </summary>
+    private void CacheVisualReferences()
+    {
+        if (backgroundImageReference == null)
+        {
+            backgroundImageReference = GetComponent<Image>();
+        }
+
+        Image[] childImages = GetComponentsInChildren<Image>(true);
+        if ((iconImageReference == null || accentGraphicReferences == null || accentGraphicReferences.Length == 0) && childImages != null)
+        {
+            System.Collections.Generic.List<Graphic> accentGraphics = new System.Collections.Generic.List<Graphic>(4);
+
+            for (int i = 0; i < childImages.Length; i++)
+            {
+                Image candidateImage = childImages[i];
+                if (candidateImage == null || candidateImage == backgroundImageReference)
+                {
+                    continue;
+                }
+
+                RectTransform rectTransform = candidateImage.rectTransform;
+                float width = Mathf.Abs(rectTransform.rect.width);
+                float height = Mathf.Abs(rectTransform.rect.height);
+                float minSize = Mathf.Min(width, height);
+                float maxSize = Mathf.Max(width, height);
+                bool looksLikePrimaryIcon =
+                    iconImageReference == null &&
+                    candidateImage.preserveAspect &&
+                    minSize >= 28f &&
+                    maxSize <= 96f;
+
+                if (looksLikePrimaryIcon)
+                {
+                    iconImageReference = candidateImage;
+                    continue;
+                }
+
+                bool looksLikeAccent =
+                    minSize <= 18f ||
+                    maxSize <= 28f ||
+                    (candidateImage.sprite == null && maxSize <= 64f);
+                if (looksLikeAccent)
+                {
+                    accentGraphics.Add(candidateImage);
+                }
+            }
+
+            if ((accentGraphicReferences == null || accentGraphicReferences.Length == 0) && accentGraphics.Count > 0)
+            {
+                accentGraphicReferences = accentGraphics.ToArray();
+            }
+        }
     }
 }
