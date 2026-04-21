@@ -166,10 +166,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d2d4d2e7af34f8ca6d9a9f21156b0d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameplaySceneName: SampleScene
-  backgroundColor: {r: 0.03, g: 0.05, b: 0.08, a: 1}
+  gameplaySceneName: LevelSelect
+  backgroundColor: {r: 0.9433962, g: 0.9211463, b: 0.9211463, a: 1}
   primaryAccent: {r: 1, g: 0.62, b: 0.29, a: 1}
   secondaryAccent: {r: 0.31, g: 0.86, b: 0.96, a: 1}
+  frameCoreColor: {r: 0.04, g: 0.06, b: 0.09, a: 0.92}
+  frameInsetColor: {r: 0.03, g: 0.05, b: 0.08, a: 0.96}
+  titleColor: {r: 1, g: 1, b: 1, a: 1}
+  subtitleColor: {r: 0.78, g: 0.86, b: 0.94, a: 1}
+  descriptionColor: {r: 0.82, g: 0.88, b: 0.95, a: 1}
+  hintColor: {r: 1, g: 0.82, b: 0.6, a: 1}
+  startButtonPrimaryTextColor: {r: 1, g: 1, b: 1, a: 1}
+  startButtonSecondaryTextColor: {r: 0.76, g: 0.86, b: 0.95, a: 1}
+  footerLeftTextColor: {r: 0.31, g: 0.86, b: 0.96, a: 0.95}
+  footerRightTextColor: {r: 1, g: 0.62, b: 0.29, a: 0.95}
+  buttonDisabledColor: {r: 0.3, g: 0.32, b: 0.36, a: 0.8}
+  backgroundSprite: {fileID: 0}
+  frameCoreSprite: {fileID: 0}
+  frameInsetSprite: {fileID: 0}
+  startButtonSprite: {fileID: 0}
+  titleFontAsset: {fileID: 0}
+  bodyFontAsset: {fileID: 0}
+  accentFontAsset: {fileID: 0}
+  titleCopy: Power Grid Defense
+  subtitleCopy: Power Grid Defense / Prototype Access Terminal
+  descriptionCopy: "Enter the current tower-defense test mission here.\n\nUse generators and turrets to expand your defense network under limited energy.\n\nPress Start below to load the active gameplay scene."
+  hintCopy: START will open the mission selection page
+  startPrimaryCopy: Start
+  startSecondaryCopy: OPEN LEVEL SELECT / MISSION TERMINAL
+  footerLeftCopy: ENTRY NODE / MAIN MENU
+  footerRightCopy: Press Enter / Space or click Start
   sceneCamera: {fileID: 452637971}
   mainCanvas: {fileID: 1674773601}
   canvasScaler: {fileID: 1674773600}
@@ -271,7 +297,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.03, g: 0.05, b: 0.08, a: 1}
+  m_BackGroundColor: {r: 0.9433962, g: 0.9211463, b: 0.9211463, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -727,7 +753,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Power Grid Defense
+  m_text: "\u7535\u91CF\u9632\u7EBF"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1197,7 +1223,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Start Game
+  m_text: "\u5F00\u59CB\u6E38\u620F"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1331,7 +1357,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Enter the current tower-defense test mission here.\n\nUse generators and turrets to expand your defense network under limited energy.\n\nPress Start below to load the active gameplay scene.
+  m_text: "\u5728\u8FD9\u91CC\u8FDB\u5165\u5F53\u524D\u5854\u9632\u6D4B\u8BD5\u5173\u5361\u3002\n\n\u4F60\u5C06\u4F7F\u7528\u53D1\u7535\u673A\u4E0E\u70AE\u5854\uFF0C\u5728\u6709\u9650\u7535\u91CF\u4E0B\u6CBF\u90E8\u7F72\u7F51\u7EDC\u9010\u6B65\u6269\u5F20\u9632\u7EBF\u3002\n\n\u70B9\u51FB\u4E0B\u65B9\u5F00\u59CB\uFF0C\u5373\u53EF\u5207\u6362\u5230\u5F53\u524D\u5236\u4F5C\u4E2D\u7684\u73A9\u6CD5\u573A\u666F\u3002"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1533,7 +1559,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.03, g: 0.05, b: 0.08, a: 1}
+  m_Color: {r: 0.9433962, g: 0.9211463, b: 0.9211463, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1626,9 +1652,9 @@ Canvas:
   m_GameObject: {fileID: 1674773598}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 1
-  m_Camera: {fileID: 452637971}
-  m_PlaneDistance: 10
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
   m_OverrideSorting: 0
@@ -1649,11 +1675,11 @@ RectTransform:
   m_GameObject: {fileID: 1674773598}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 91802067}
   - {fileID: 1646251665}
+  - {fileID: 91802067}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}

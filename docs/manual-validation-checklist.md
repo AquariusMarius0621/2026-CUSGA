@@ -1,6 +1,6 @@
 # 最终人工验证清单
 
-Updated: 2026-04-19
+Updated: 2026-04-20
 
 ## 使用说明
 - 这份清单给你在 Unity 里逐项人工验证当前项目状态用。
@@ -25,7 +25,7 @@ Updated: 2026-04-19
   - 能看到 `HUD Theme`
   - `placementRingSpriteReference` 不是空
   - 四张按钮引用都不是空
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 2. RuntimePrototypes 根节点
@@ -34,7 +34,7 @@ Updated: 2026-04-19
   - 能看到 `RelayTowerPrototype`
   - 能看到 `DefenseTowerPrototype`
   - 能看到 `EnemyPrototype`
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 3. RelayTowerPrototype 层级与引用
@@ -43,7 +43,7 @@ Updated: 2026-04-19
   - 子物体里有 `VisualRoot`
   - `RelayTower` 组件里的 `visualRootReference` 指向 `VisualRoot`
   - `bodyRendererReference` 指向 `VisualRoot` 上的 `SpriteRenderer`
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 4. DefenseTowerPrototype 层级与引用
@@ -55,7 +55,8 @@ Updated: 2026-04-19
   - `feedbackRootReference` 指向 `FeedbackRoot`
   - `typeSignatureRootReference` 指向 `TypeSignatureRoot`
   - `levelMarkerRootReference` 指向 `LevelMarkerRoot`
-- 结果：
+  - `singleTargetTuning.bodySprite` / `slowFieldTuning.bodySprite` / `bombardTuning.bodySprite` 这三个入口可见
+- 结果：通过
 - 备注：
 
 ### 5. EnemyPrototype 层级与引用
@@ -66,7 +67,7 @@ Updated: 2026-04-19
   - `bodyRendererReference` 指向 `VisualScaleRoot` 上的 `SpriteRenderer`
   - `visualScaleRootReference` 指向 `VisualScaleRoot`
   - `healthBarRootReference` 指向 `HealthBarRoot`
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 6. 四张部署卡 Inspector
@@ -79,7 +80,7 @@ Updated: 2026-04-19
   - 每张卡的 `TowerShopCard` 都能看到 `backgroundImageReference`
   - 每张卡的 `TowerShopCard` 都能看到 `iconImageReference`
   - 前两张卡的 `accentGraphicReferences` 不是空
-- 结果：
+- 结果：通过
 - 备注：
 
 ---
@@ -92,6 +93,18 @@ Updated: 2026-04-19
   - 右侧四张部署卡正常显示
   - 左侧操作区正常显示
   - 控制台没有红色报错
+- 额外检查：
+  - 敌人路线不会全程常驻挡住视线
+- 结果：通过
+- 备注：
+
+### 1.1 波前路线预告
+- 检查点：
+  - 第一波正式出怪前约 2 秒会短暂显示敌人路线
+  - 后续波次只有在“实际显示给玩家看的路线集合”和上一波不同的时候，才会再次短暂显示路线
+  - 如果相邻两波路线完全一样，就不会重复显示
+  - 该波怪物开始出发后，路线会自动隐藏
+  - 放置塔不会错误触发路线再次显示
 - 结果：
 - 备注：
 
@@ -101,14 +114,14 @@ Updated: 2026-04-19
   - 放置圆环正常显示
   - 合法区提示正常显示
   - 松手后继电器成功落地
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 3. 检查继电器实例层级
 - 检查点：
   - 运行时生成的继电器实例外观在 `VisualRoot` 这层
   - 调整 `VisualRoot` 只影响继电器外观，不影响整体逻辑根
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 4. 放置战斗塔
@@ -118,7 +131,7 @@ Updated: 2026-04-19
     - `FeedbackRoot`
     - `TypeSignatureRoot`
     - `LevelMarkerRoot`
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 5. 敌人表现
@@ -126,7 +139,7 @@ Updated: 2026-04-19
   - 敌人血条正常显示在身体上方
   - 敌人受击时身体反馈正常
   - 血条不会因为身体缩放反馈乱跳
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 6. 三类战斗反馈
@@ -135,8 +148,10 @@ Updated: 2026-04-19
   - 减速塔有范围脉冲
   - 炸弹塔有飞行物和爆炸
   - 运行时反馈对象正常挂在 `FeedbackRoot`
-- 结果：
-- 备注：
+- 如果你已经替换了三种塔的主塔身 Sprite：
+  - 三种塔主体外观应当彼此独立
+- 结果：通过
+- 备注：当前逻辑链路、`FeedbackRoot` 挂点和运行时反馈 Prefab 都已经接通；如果你想让单体塔 tracer、炸弹塔飞行物和爆炸更明显，后续确实主要是你自己补正式美术资源。直接改这些 Prefab 即可：`Assets/Prefabs/TowerDefense/Vfx/ShotTrace.prefab`、`Assets/Prefabs/TowerDefense/Vfx/SlowPulse.prefab`、`Assets/Prefabs/TowerDefense/Vfx/BombProjectile.prefab`、`Assets/Prefabs/TowerDefense/Vfx/BombExplosion.prefab`。优先替换它们的 Sprite、颜色、缩放，或者给这些 Prefab 增加自己的子层级，不需要重写塔的玩法代码。
 
 ---
 
@@ -148,14 +163,14 @@ Updated: 2026-04-19
   - 能看到 `Visual Theme`
   - 能看到 `Text Copy`
   - 可以直接修改颜色、Sprite、字体、文案
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 2. 主菜单场景对象联动
 - 检查点：
   - 修改一个主题颜色后，场景里的主菜单对象能跟着变
   - 修改一段文案后，场景里的对应文字能跟着变
-- 结果：
+- 结果：通过
 - 备注：
 
 ---
@@ -166,14 +181,14 @@ Updated: 2026-04-19
 - 检查点：
   - 主菜单界面正常显示
   - 相机背景、按钮、标题、正文都正常
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 2. 点击开始按钮
 - 检查点：
   - 能正常切到 `SampleScene`
   - 没有按钮引用丢失报错
-- 结果：
+- 结果：通过
 - 备注：
 
 ---
@@ -185,24 +200,47 @@ Updated: 2026-04-19
   - 没有 Missing Reference
   - 没有 NullReference
   - 没有脚本编译错误
-- 结果：
+- 结果：通过
 - 备注：
 
 ### 2. MainMenu 控制台
 - 检查点：
   - 没有主菜单缺引用报错
   - 没有切场景时报错
+- 结果：通过
+- 备注：
+
+---
+
+## 六、LevelSelect 检查
+
+### 1. LevelSelect 静态检查
+- 检查对象：`LevelSelect / LevelSelectSceneController`
+- 检查点：
+  - `LevelSelectController` Inspector 里能看到 `levels`
+  - 能看到返回主菜单场景名
+  - 能看到主题颜色、字体和文案入口
+  - 能看到 `LevelCardsRoot` 和 `levelCards`
+- 结果：
+- 备注：
+
+### 2. LevelSelect Play 检查
+- 检查点：
+  - 从 `MainMenu` 点击开始后，会先进入 `LevelSelect`
+  - 页面上能看到 5 张关卡卡片
+  - 点击任意一张卡片能进入对应关卡场景
+  - 点击返回按钮能回到 `MainMenu`
 - 结果：
 - 备注：
 
 ---
 
-## 六、最终结论
+## 七、最终结论
 
 ### 你自己的总体判断
 - 当前版本是否可以进入“继续做地图 / 继续换美术资源”的状态：
-- 你的结论：
-- 备注：
+- 你的结论：是
+- 备注：继电器、防御塔、敌人，以及四种基础反馈实体都已经整理成 Prefab。后续你要改运行时美术时，优先改 `Assets/Prefabs/TowerDefense/Runtime` 和 `Assets/Prefabs/TowerDefense/Vfx` 下面的资产即可。
 
 ### 需要我继续处理的问题
 - 问题 1：

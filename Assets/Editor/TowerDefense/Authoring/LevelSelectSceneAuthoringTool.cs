@@ -1,0 +1,57 @@
+using System;
+using System.Reflection;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+namespace TowerDefense.Editor
+{
+    /// <summary>
+    /// 这个作者工具负责把 `LevelSelect` 场景真正物化成“打开就能看到并编辑的 UI 场景”。
+    ///
+    /// `LevelSelectController` 本身虽然支持首次打开时自动补骨架，
+    /// 但这个工具还能把那套骨架直接保存回场景文件里，
+    /// 让用户一打开 `LevelSelect` 就已经能在 Hierarchy / Scene 里看到那些对象。
+    /// </summary>
+    public static class LevelSelectSceneAuthoringTool
+    {
+        private const string LevelSelectScenePath = "Assets/Scenes/LevelSelect.unity";
+
+        [MenuItem("Tools/Tower Defense/Materialize Level Select Scene")]
+        public static void BatchCreateOrUpdateLevelSelectScene()
+        {
+            EditorSceneManager.OpenScene(LevelSelectScenePath, OpenSceneMode.Single);
+
+            LevelSelectController controller = UnityEngine.Object.FindFirstObjectByType<LevelSelectController>();
+            if (controller == null)
+            {
+                throw new InvalidOperationException("LevelSelect scene is missing LevelSelectController.");
+            }
+
+            InvokePrivate(controller, "EnsureDefaultLevelDefinitions");
+            InvokePrivate(controller, "EnsureEditorSceneReferences");
+            InvokePrivate(controller, "EnsureSceneObjects");
+            InvokePrivate(controller, "ApplyThemeAndCopyToBoundSceneObjects");
+            InvokePrivate(controller, "BindButtons");
+
+            EditorUtility.SetDirty(controller);
+            EditorSceneManager.MarkSceneDirty(controller.gameObject.scene);
+            EditorSceneManager.SaveScene(controller.gameObject.scene);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            Debug.Log("LevelSelectSceneAuthoringTool: LevelSelect scene materialized successfully.");
+        }
+
+        private static void InvokePrivate(LevelSelectController controller, string methodName)
+        {
+            MethodInfo method = typeof(LevelSelectController).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (method == null)
+            {
+                throw new MissingMethodException(typeof(LevelSelectController).Name, methodName);
+            }
+
+            method.Invoke(controller, null);
+        }
+    }
+}
