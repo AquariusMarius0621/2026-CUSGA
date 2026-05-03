@@ -365,6 +365,17 @@ public sealed class MainMenuController : MonoBehaviour
         ApplyThemeAndCopyToBoundSceneObjects();
     }
 
+    public void EditorMaterializeDefaultSceneUi()
+    {
+        EnsureSceneObjects();
+    }
+
+    public void EditorApplyAuthoringToScene()
+    {
+        EnsureSceneObjects();
+        ApplyThemeAndCopyToBoundSceneObjects();
+    }
+
     /// <summary>
     /// 额外支持 Enter / Space 作为开始键。
     ///

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -25,6 +26,14 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class BuildZone : MonoBehaviour
 {
+    private const string DefaultZoneShapeRootName = "ZoneShapes";
+
+    [Header("Shape Authoring")]
+    [SerializeField] private Transform zoneShapeRootReference;
+    [SerializeField] private Collider2D[] zoneShapeColliders = new Collider2D[0];
+    [SerializeField] private bool autoCollectZoneShapes = true;
+    [SerializeField] private bool includeInactiveShapes = true;
+
     [Header("Gizmo")]
 
     /// <summary>
@@ -50,6 +59,8 @@ public class BuildZone : MonoBehaviour
     /// 主要是为了以后如果你想做调试显示或编辑器工具时能方便取到范围数据。
     /// </summary>
     public Bounds WorldBounds => _boxCollider != null ? _boxCollider.bounds : new Bounds(transform.position, Vector3.zero);
+    public Transform ZoneShapeRoot => zoneShapeRootReference;
+    public int ZoneShapeCount => CollectValidZoneShapes(null);
 
     /// <summary>
     /// 在运行时初始化引用，并确保碰撞盒以 Trigger 模式工作。
@@ -60,6 +71,12 @@ public class BuildZone : MonoBehaviour
     private void Awake()
     {
         CacheReference();
+        TryAssignZoneShapeRoot();
+        if (autoCollectZoneShapes)
+        {
+            CollectZoneShapeColliders();
+        }
+
         EnsureTriggerMode();
     }
 
@@ -72,6 +89,12 @@ public class BuildZone : MonoBehaviour
     private void OnValidate()
     {
         CacheReference();
+        TryAssignZoneShapeRoot();
+        if (autoCollectZoneShapes)
+        {
+            CollectZoneShapeColliders();
+        }
+
         EnsureTriggerMode();
     }
 
@@ -84,7 +107,44 @@ public class BuildZone : MonoBehaviour
     public bool ContainsPoint(Vector3 worldPosition)
     {
         CacheReference();
+
+        if (CollectValidZoneShapes(null) > 0)
+        {
+            for (int index = 0; index < zoneShapeColliders.Length; index++)
+            {
+                Collider2D shapeCollider = zoneShapeColliders[index];
+                if (shapeCollider != null && shapeCollider.OverlapPoint(worldPosition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         return _boxCollider != null && _boxCollider.OverlapPoint(worldPosition);
+    }
+
+    public string BuildAuthoringSummary()
+    {
+        CacheReference();
+        string rootName = zoneShapeRootReference != null ? zoneShapeRootReference.name : "(BuildZone Root)";
+        string colliderName = _boxCollider != null ? _boxCollider.GetType().Name : "未设置";
+        return $"ZoneShapeRoot={rootName} | ShapeColliders={ZoneShapeCount} | FallbackCollider={colliderName}";
+    }
+
+    public bool CollectZoneShapeColliders()
+    {
+        List<Collider2D> collectedColliders = new List<Collider2D>();
+        Transform collectionRoot = zoneShapeRootReference != null ? zoneShapeRootReference : transform;
+        CollectCollidersInHierarchyOrder(collectionRoot, includeInactiveShapes, collectedColliders);
+
+        if (collectionRoot == transform && _boxCollider != null)
+        {
+            collectedColliders.RemoveAll(candidate => candidate == _boxCollider);
+        }
+
+        return AssignColliderArray(collectedColliders);
     }
 
     /// <summary>
@@ -113,6 +173,105 @@ public class BuildZone : MonoBehaviour
         if (_boxCollider != null)
         {
             _boxCollider.isTrigger = true;
+        }
+
+        for (int index = 0; index < zoneShapeColliders.Length; index++)
+        {
+            if (zoneShapeColliders[index] != null)
+            {
+                zoneShapeColliders[index].isTrigger = true;
+            }
+        }
+    }
+
+    private void TryAssignZoneShapeRoot()
+    {
+        if (zoneShapeRootReference != null)
+        {
+            return;
+        }
+
+        Transform existingRoot = transform.Find(DefaultZoneShapeRootName);
+        if (existingRoot != null)
+        {
+            zoneShapeRootReference = existingRoot;
+        }
+    }
+
+    private int CollectValidZoneShapes(List<Collider2D> output)
+    {
+        int count = 0;
+        for (int index = 0; index < zoneShapeColliders.Length; index++)
+        {
+            Collider2D shapeCollider = zoneShapeColliders[index];
+            if (shapeCollider == null)
+            {
+                continue;
+            }
+
+            count++;
+            output?.Add(shapeCollider);
+        }
+
+        return count;
+    }
+
+    private bool AssignColliderArray(List<Collider2D> collectedColliders)
+    {
+        bool changed = zoneShapeColliders.Length != collectedColliders.Count;
+        if (!changed)
+        {
+            for (int index = 0; index < zoneShapeColliders.Length; index++)
+            {
+                if (zoneShapeColliders[index] != collectedColliders[index])
+                {
+                    changed = true;
+                    break;
+                }
+            }
+        }
+
+        if (!changed)
+        {
+            return false;
+        }
+
+        zoneShapeColliders = collectedColliders.ToArray();
+        return true;
+    }
+
+    private static void CollectCollidersInHierarchyOrder(Transform root, bool includeInactive, List<Collider2D> output)
+    {
+        output.Clear();
+        if (root == null)
+        {
+            return;
+        }
+
+        TraverseColliderHierarchy(root, includeInactive, output);
+    }
+
+    private static void TraverseColliderHierarchy(Transform current, bool includeInactive, List<Collider2D> output)
+    {
+        if (current == null)
+        {
+            return;
+        }
+
+        if (!includeInactive && !current.gameObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        Collider2D collider = current.GetComponent<Collider2D>();
+        if (collider != null)
+        {
+            output.Add(collider);
+        }
+
+        for (int childIndex = 0; childIndex < current.childCount; childIndex++)
+        {
+            TraverseColliderHierarchy(current.GetChild(childIndex), includeInactive, output);
         }
     }
 

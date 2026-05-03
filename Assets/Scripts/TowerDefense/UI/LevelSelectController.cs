@@ -210,6 +210,21 @@ public sealed class LevelSelectController : MonoBehaviour
         ApplyThemeAndCopyToBoundSceneObjects();
     }
 
+    public void EditorMaterializeSceneUi()
+    {
+        EnsureDefaultLevelDefinitions();
+        EnsureEditorSceneReferences();
+        EnsureSceneObjects();
+    }
+
+    public void EditorApplyAuthoringToScene()
+    {
+        EnsureDefaultLevelDefinitions();
+        EnsureEditorSceneReferences();
+        EnsureSceneObjects();
+        ApplyThemeAndCopyToBoundSceneObjects();
+    }
+
     private void Update()
     {
         if (!Application.isPlaying)

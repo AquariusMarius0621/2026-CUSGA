@@ -35,6 +35,11 @@ public sealed class BattlefieldMapDefinition : MonoBehaviour
         return $"BuildZone={(buildZoneReference != null ? buildZoneReference.name : "None")}, SpawnGates={SpawnGateCount}, DefensePoints={DefensePointCount}, RelayLimit={RelayLimit}";
     }
 
+    public string BuildAuthoringSummary()
+    {
+        return BuildDebugSummary();
+    }
+
     /// <summary>
     /// 把这张地图当前最明显的配置缺口打印成警告。
     ///
@@ -98,6 +103,11 @@ public sealed class BattlefieldMapDefinition : MonoBehaviour
     private void OnValidate()
     {
         relayLimit = Mathf.Max(0, relayLimit);
+    }
+
+    public bool CollectSceneReferences()
+    {
+        return false;
     }
 
     private int CollectValidSpawnGates(List<EnemySpawnGate> output)

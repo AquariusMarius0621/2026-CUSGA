@@ -2819,9 +2819,9 @@ MonoBehaviour:
     dragPreviewPanelOffset: {x: 142, y: -92}
   mainCameraReference: {fileID: 519420031}
   relayTowerPrototypeReference: {fileID: 9207050540261146186, guid: e2a07bbdd44c37941931ff89c6bdffc9, type: 3}
-  singleTargetTowerPrototypeReference: {fileID: 1495046802758886609, guid: e90c30133a79485b8ed5c5456c286e55, type: 3}
-  slowFieldTowerPrototypeReference: {fileID: 1495046802758886609, guid: d6776ec2df56481bb76febf84182b36e, type: 3}
-  bombardTowerPrototypeReference: {fileID: 1495046802758886609, guid: 416799d435354c19a020fc72911f03e3, type: 3}
+  singleTargetTowerPrototypeReference: {fileID: 1719944049, guid: e90c30133a79485b8ed5c5456c286e55, type: 3}
+  slowFieldTowerPrototypeReference: {fileID: 1719944049, guid: d6776ec2df56481bb76febf84182b36e, type: 3}
+  bombardTowerPrototypeReference: {fileID: 1719944049, guid: 416799d435354c19a020fc72911f03e3, type: 3}
   placedTowerRootReference: {fileID: 767248244}
   placementPreviewRootReference: {fileID: 0}
   buildZoneReference: {fileID: 425466730}

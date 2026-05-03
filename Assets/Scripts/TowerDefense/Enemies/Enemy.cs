@@ -124,6 +124,10 @@ public class Enemy : MonoBehaviour
     private SpriteRenderer _healthBarBackgroundRenderer;
 
     private EnemyPath _path;
+    private EnemyCatalogAsset _enemyCatalog;
+    private EnemyCatalogAsset.EnemyArchetypeDefinition _currentDefinition;
+    private EnemyArchetypeId _currentArchetypeId = EnemyArchetypeId.None;
+    private Transform _enemyRoot;
     private float _moveSpeed;
     private float _slowMultiplier = 1f;
     private float _slowTimer;
@@ -142,6 +146,14 @@ public class Enemy : MonoBehaviour
     private float _pulseScaleMultiplier = 1f;
 
     public static int ActiveEnemyCount => ActiveEnemies.Count;
+    public bool IsAlive => _currentHealth > 0 && !_hasReachedBase;
+    public EnemyCatalogAsset.EnemyArchetypeDefinition CurrentDefinition => _currentDefinition;
+    public EnemyPath CurrentPath => _path;
+    public Transform EnemyRoot => _enemyRoot != null ? _enemyRoot : transform.parent;
+    public int CurrentWaypointIndex => Mathf.Max(0, _targetWaypointIndex - 1);
+    public int CurrentHealth => _currentHealth;
+    public int MaxHealth => _maxHealth;
+    public bool CanReceiveMechanicRepair => _currentDefinition != null ? _currentDefinition.CanBeRepairedByMechanic : true;
 
     public static Enemy GetActiveEnemy(int index)
     {
@@ -213,6 +225,13 @@ public class Enemy : MonoBehaviour
     {
         CacheReferences();
         _baseScale = (visualScaleRootReference != null ? visualScaleRootReference : transform).localScale;
+        _enemyRoot = transform.parent;
+        if (_enemyCatalog == null)
+        {
+            _currentDefinition = null;
+            _currentArchetypeId = EnemyArchetypeId.None;
+        }
+
         ApplyVisualTheme();
 
         _path = path;
@@ -235,6 +254,47 @@ public class Enemy : MonoBehaviour
 
         RefreshBodyVisualState();
         UpdateHealthBar();
+    }
+
+    /// <summary>
+    /// 这是给新版“敌人目录 + 机制模块”工作流准备的兼容初始化入口。
+    ///
+    /// 当前第一关主链仍然可以继续走旧的 `Initialize(path, moveSpeed, health, reward)`，
+    /// 但当后续关卡或新 prefab 已经开始依赖 `EnemyCatalogAsset` 时，
+    /// 它们也能通过这个重载把目录定义、安全地桥接进这份旧敌人实现。
+    /// </summary>
+    public void Initialize(
+        EnemyPath path,
+        EnemyCatalogAsset enemyCatalog,
+        EnemyArchetypeId archetypeId,
+        GameObject enemyPrototypePrefab,
+        Transform enemyRoot)
+    {
+        _enemyCatalog = enemyCatalog;
+        _currentArchetypeId = archetypeId;
+        _currentDefinition = enemyCatalog != null ? enemyCatalog.GetDefinition(archetypeId) : null;
+        _enemyRoot = enemyRoot != null ? enemyRoot : transform.parent;
+
+        float moveSpeed = _currentDefinition != null ? _currentDefinition.MoveSpeed : 1.8f;
+        int maxHealth = _currentDefinition != null ? _currentDefinition.MaxHealth : 3;
+        int scrapReward = _currentDefinition != null ? _currentDefinition.ScrapReward : 0;
+
+        if (_currentDefinition != null)
+        {
+            bodyColor = _currentDefinition.BodyColor;
+
+            if (_currentDefinition.BodySpriteOverride != null && bodyRendererReference != null)
+            {
+                bodyRendererReference.sprite = _currentDefinition.BodySpriteOverride;
+            }
+
+            Transform scaleTarget = visualScaleRootReference != null ? visualScaleRootReference : transform;
+            scaleTarget.localScale = _baseScale * _currentDefinition.BodyScaleMultiplier;
+            _baseScale = scaleTarget.localScale;
+        }
+
+        Initialize(path, moveSpeed, maxHealth, scrapReward);
+        BindMechanicModules();
     }
 
     /// <summary>
@@ -338,6 +398,8 @@ public class Enemy : MonoBehaviour
 
     private void Die()
     {
+        NotifyModulesBeforeDeath();
+
         // Enemy death is now part of the economy loop:
         // after a legal kill, the current wave definition can immediately feed scrap back into the player's resource pool.
         if (_scrapRewardOnDeath > 0 && TowerDefenseGame.Instance != null && !TowerDefenseGame.Instance.IsGameOver)
@@ -346,6 +408,107 @@ public class Enemy : MonoBehaviour
         }
 
         Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// 新版特殊机制模块会在敌人正式销毁前收到一次统一通知。
+    /// 旧第一关里就算场景上没有任何模块，这个循环也只会零成本略过。
+    /// </summary>
+    private void NotifyModulesBeforeDeath()
+    {
+        EnemyMechanicModule[] modules = GetComponents<EnemyMechanicModule>();
+        for (int index = 0; index < modules.Length; index++)
+        {
+            if (modules[index] != null)
+            {
+                modules[index].OnBeforeDeath();
+            }
+        }
+    }
+
+    private void BindMechanicModules()
+    {
+        EnemyMechanicModule[] modules = GetComponents<EnemyMechanicModule>();
+        for (int index = 0; index < modules.Length; index++)
+        {
+            if (modules[index] != null)
+            {
+                modules[index].BindOwner(this);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 供新版护盾光环模块调用。
+    /// 当前旧第一关并没有完整护盾系统，所以这里先采用一个最保守的兼容实现：
+    /// - 只要目标还活着，就把它当作一次“轻度修复/护盾补偿”事件处理
+    /// - 不引入额外状态字段，避免反向改坏旧关卡的伤害链
+    /// </summary>
+    public void ApplyShieldIfWeaker(int shieldAmount)
+    {
+        if (!IsAlive || shieldAmount <= 0)
+        {
+            return;
+        }
+
+        ReceiveRepair(shieldAmount);
+    }
+
+    /// <summary>
+    /// 供新版机械师模块调用的兼容回血入口。
+    /// </summary>
+    public void ReceiveRepair(int amount)
+    {
+        if (!IsAlive || amount <= 0)
+        {
+            return;
+        }
+
+        _currentHealth = Mathf.Min(_maxHealth, _currentHealth + amount);
+        UpdateHealthBar();
+    }
+
+    /// <summary>
+    /// 供新版死亡分裂模块调用的兼容子怪生成入口。
+    /// 如果当前没有目录定义或 prefab 根本不存在，就安静跳过，不把旧第一关主链炸掉。
+    /// </summary>
+    public void SpawnConfiguredChild(
+        EnemyArchetypeId childArchetypeId,
+        Vector3 spawnPosition,
+        int waypointIndex,
+        string childName)
+    {
+        if (_enemyCatalog == null)
+        {
+            return;
+        }
+
+        EnemyCatalogAsset.EnemyArchetypeDefinition childDefinition = _enemyCatalog.GetDefinition(childArchetypeId);
+        if (childDefinition == null || childDefinition.RuntimePrefab == null || _path == null)
+        {
+            return;
+        }
+
+        GameObject childObject = Instantiate(
+            childDefinition.RuntimePrefab,
+            spawnPosition,
+            Quaternion.identity,
+            EnemyRoot);
+        childObject.name = string.IsNullOrWhiteSpace(childName) ? childDefinition.DisplayName : childName;
+
+        Enemy childEnemy = childObject.GetComponent<Enemy>();
+        if (childEnemy == null)
+        {
+            return;
+        }
+
+        childEnemy.Initialize(_path, _enemyCatalog, childArchetypeId, childDefinition.RuntimePrefab, EnemyRoot);
+        childEnemy.SetWaypointIndexForSpawn(Mathf.Max(waypointIndex, 0));
+    }
+
+    private void SetWaypointIndexForSpawn(int waypointIndex)
+    {
+        _targetWaypointIndex = Mathf.Max(1, waypointIndex + 1);
     }
 
     private void UpdateHealthBar()

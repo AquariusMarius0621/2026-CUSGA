@@ -58,6 +58,11 @@ public sealed class EnemySpawnGate : MonoBehaviour
         return enemyPathReference != null ? enemyPathReference.GetSpawnPosition() : transform.position;
     }
 
+    public void EditorRefreshAuthoringState()
+    {
+        RefreshReadabilityVisuals(force: true);
+    }
+
     private void Awake()
     {
         RefreshReadabilityVisuals(force: true);

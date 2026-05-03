@@ -27,6 +27,11 @@ using UnityEngine;
 public class EnemyPath : MonoBehaviour
 {
     private const string ReadabilityRootName = "__PathReadability";
+    private const string WaypointRootName = "Waypoints";
+
+    [Header("Waypoint Authoring")]
+    [SerializeField] private Transform waypointRootReference;
+    [SerializeField] private bool autoFindWaypointRoot = true;
 
     [Header("Readability Overlay")]
     [SerializeField] private bool showReadabilityOverlay = true;
@@ -73,6 +78,7 @@ public class EnemyPath : MonoBehaviour
     /// 当前路径点数量。
     /// </summary>
     public int WaypointCount => _waypoints.Count;
+    public Transform WaypointRoot => waypointRootReference;
 
     /// <summary>
     /// 在运行时初始化路径点缓存和路径表现。
@@ -113,6 +119,15 @@ public class EnemyPath : MonoBehaviour
     /// </summary>
     private void OnValidate()
     {
+        if (waypointRootReference == null && autoFindWaypointRoot)
+        {
+            Transform existingWaypointRoot = transform.Find(WaypointRootName);
+            if (existingWaypointRoot != null)
+            {
+                waypointRootReference = existingWaypointRoot;
+            }
+        }
+
         if (readabilityRootReference == null)
         {
             Transform existingRoot = transform.Find(ReadabilityRootName);
@@ -197,9 +212,26 @@ public class EnemyPath : MonoBehaviour
         _waypoints.Clear();
         _localRoutePoints.Clear();
 
+        Transform waypointContainer = waypointRootReference;
+        if (waypointContainer != null)
+        {
+            foreach (Transform child in waypointContainer)
+            {
+                if (child == null)
+                {
+                    continue;
+                }
+
+                _waypoints.Add(child);
+                _localRoutePoints.Add(transform.InverseTransformPoint(child.position));
+            }
+
+            return;
+        }
+
         foreach (Transform child in transform)
         {
-            if (child == null || child.name == ReadabilityRootName)
+            if (child == null || child.name == ReadabilityRootName || child.name == WaypointRootName)
             {
                 continue;
             }
@@ -288,6 +320,12 @@ public class EnemyPath : MonoBehaviour
         }
 
         _runtimeReadabilityVisible = visible;
+        RefreshReadabilityVisuals(force: true);
+    }
+
+    public void EditorRefreshAuthoringState()
+    {
+        CacheWaypoints();
         RefreshReadabilityVisuals(force: true);
     }
 

@@ -1,5 +1,4 @@
-using System;
-using System.Reflection;
+﻿using System;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -15,9 +14,9 @@ namespace TowerDefense.Editor
     /// </summary>
     public static class LevelSelectSceneAuthoringTool
     {
-        private const string LevelSelectScenePath = "Assets/Scenes/LevelSelect.unity";
+        private const string LevelSelectScenePath = "Assets/Scenes/LevelSelect.unity"; // 中文：等级Select场景路径
 
-        [MenuItem("Tools/Tower Defense/Materialize Level Select Scene")]
+        [MenuItem("Tools/Tower Defense/物化关卡选择场景")]
         public static void BatchCreateOrUpdateLevelSelectScene()
         {
             EditorSceneManager.OpenScene(LevelSelectScenePath, OpenSceneMode.Single);
@@ -25,14 +24,10 @@ namespace TowerDefense.Editor
             LevelSelectController controller = UnityEngine.Object.FindFirstObjectByType<LevelSelectController>();
             if (controller == null)
             {
-                throw new InvalidOperationException("LevelSelect scene is missing LevelSelectController.");
+                throw new InvalidOperationException("LevelSelect 场景缺少 LevelSelectController。");
             }
 
-            InvokePrivate(controller, "EnsureDefaultLevelDefinitions");
-            InvokePrivate(controller, "EnsureEditorSceneReferences");
-            InvokePrivate(controller, "EnsureSceneObjects");
-            InvokePrivate(controller, "ApplyThemeAndCopyToBoundSceneObjects");
-            InvokePrivate(controller, "BindButtons");
+            controller.EditorMaterializeSceneUi();
 
             EditorUtility.SetDirty(controller);
             EditorSceneManager.MarkSceneDirty(controller.gameObject.scene);
@@ -40,18 +35,7 @@ namespace TowerDefense.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("LevelSelectSceneAuthoringTool: LevelSelect scene materialized successfully.");
-        }
-
-        private static void InvokePrivate(LevelSelectController controller, string methodName)
-        {
-            MethodInfo method = typeof(LevelSelectController).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-            if (method == null)
-            {
-                throw new MissingMethodException(typeof(LevelSelectController).Name, methodName);
-            }
-
-            method.Invoke(controller, null);
+            Debug.Log("LevelSelectSceneAuthoringTool：关卡选择场景物化完成。");
         }
     }
 }

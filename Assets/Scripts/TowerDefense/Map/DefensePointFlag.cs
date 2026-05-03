@@ -44,6 +44,11 @@ public sealed class DefensePointFlag : MonoBehaviour
     public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? PointId : displayName;
     public Vector3 WorldPosition => transform.position;
 
+    public void EditorRefreshAuthoringState()
+    {
+        RefreshReadabilityVisuals(force: true);
+    }
+
     private void Awake()
     {
         RefreshReadabilityVisuals(force: true);

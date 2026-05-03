@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 031e38bf5acb46259b8c5931f3fe34b8, type: 3}
+  m_Name: TowerDefenseHudCopy
+  m_EditorClassIdentifier: 
+  scrapMetricLabel: 废料储备
+  baseMetricLabel: 基地核心
+  waveMetricLabel: 波次进度
+  deployTraceTitle: 部署追踪
+  tacticalReadyTitle: 战术待命
+  structureLinkTitle: 建筑链接
+  operationLinkTitle: 战局记录
+  idleOperationSummary: 点击或拖拽塔卡，预览当前合法建造区域。
+  idleOperationHotkeys: 1 继电器 / 2 单体塔 / 3 减速塔 / 4 炸弹塔 / Esc 取消
+  dragGridLabel: 网络
+  dragLegalHint: 青色区域代表当前准确的合法落点
+  dragValidStateLabel: 落点确认
+  dragSelectedLegalHint: 青色区域 = 当前合法范围
+  liveStatusTitle: 实时状态
+  powerGridTitle: 供电网络
+  latestEventTitle: 最新事件
+  recentLogTitle: 近期记录
+  relayCountLabel: 继电器
+  onlineTowerCountLabel: 战斗塔
+  onlineTowerSuffix: 在线
+  loadLabel: 负载
+  freeDeployLine: 免费部署，不消耗废料。
+  scrapLeftSuffix: 部署后剩余废料。
+  needMoreScrapPrefix: 还需要
+  needMoreScrapSuffix: 点废料才能部署。
+  cancelDeployPrimary: 取消部署
+  cancelDeploySecondary: Esc / 右键
