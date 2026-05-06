@@ -107,7 +107,35 @@ public sealed class BattlefieldMapDefinition : MonoBehaviour
 
     public bool CollectSceneReferences()
     {
-        return false;
+        bool changed = false;
+
+        BuildZone discoveredBuildZone = GetComponentInChildren<BuildZone>(true);
+        if (discoveredBuildZone == null)
+        {
+            discoveredBuildZone = FindFirstObjectByType<BuildZone>();
+        }
+
+        if (buildZoneReference != discoveredBuildZone)
+        {
+            buildZoneReference = discoveredBuildZone;
+            changed = true;
+        }
+
+        EnemySpawnGate[] discoveredSpawnGates = GetComponentsInChildren<EnemySpawnGate>(true);
+        if (!AreSameSequence(spawnGates, discoveredSpawnGates))
+        {
+            spawnGates = discoveredSpawnGates;
+            changed = true;
+        }
+
+        DefensePointFlag[] discoveredDefensePoints = GetComponentsInChildren<DefensePointFlag>(true);
+        if (!AreSameSequence(defensePoints, discoveredDefensePoints))
+        {
+            defensePoints = discoveredDefensePoints;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private int CollectValidSpawnGates(List<EnemySpawnGate> output)
@@ -155,5 +183,31 @@ public sealed class BattlefieldMapDefinition : MonoBehaviour
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// 比较两组场景引用是否已经完全一致。
+    ///
+    /// 这里不做集合比较，而是保留顺序比较，
+    /// 因为作者在 Inspector 里看到的数组顺序，通常就代表了他对“主路 / 副路 / 第三路线”的阅读顺序预期。
+    /// </summary>
+    private static bool AreSameSequence<T>(T[] current, T[] discovered) where T : UnityEngine.Object
+    {
+        int currentLength = current != null ? current.Length : 0;
+        int discoveredLength = discovered != null ? discovered.Length : 0;
+        if (currentLength != discoveredLength)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < currentLength; index++)
+        {
+            if (current[index] != discovered[index])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

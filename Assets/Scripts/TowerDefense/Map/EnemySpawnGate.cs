@@ -94,11 +94,6 @@ public sealed class EnemySpawnGate : MonoBehaviour
         Gizmos.color = gizmoColor;
         Gizmos.DrawSphere(transform.position, gizmoRadius);
         Gizmos.DrawWireSphere(transform.position, gizmoRadius * 1.6f);
-
-        if (targetDefensePointReference != null)
-        {
-            Gizmos.DrawLine(transform.position, targetDefensePointReference.WorldPosition);
-        }
     }
 
     /// <summary>

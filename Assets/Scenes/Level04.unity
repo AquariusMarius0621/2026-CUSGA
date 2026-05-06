@@ -181,7 +181,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Scrap: 0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 489695677}
   m_fontSharedMaterials:
   - {fileID: 489695677}
@@ -315,9 +315,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 基地
+  m_text: CORE
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -1476,7 +1476,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   towerType: 1
-  hoverHint: 拖拽卡片可预览合法区域。继电器可以放在任意空地上，战斗塔必须放在继电器覆盖范围内。
+  hoverHint: Drag the card to preview legal areas. Place relays on any empty ground,
     then deploy turrets inside relay coverage.
   backgroundImageReference: {fileID: 203997011}
   iconImageReference: {fileID: 90703277}
@@ -2457,7 +2457,7 @@ Transform:
   m_GameObject: {fileID: 308154867}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 10, y: 1.2, z: 0}
+  m_LocalPosition: {x: 2, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2754,7 +2754,7 @@ MonoBehaviour:
   starterZoneMarkerEdgeColor: {r: 0.9, g: 1, b: 0.98, a: 1}
   starterZoneMarkerSortingOrder: 10
   relayPresentation:
-    displayName: 继电器
+    displayName: Relay
     cardRoleSummary: Relay Node / Supply Grid
     selectionHint: Anchor the power grid first, then expand tower coverage from there.
     upgradeFocusSummary: Upgrades add more supply capacity without changing relay
@@ -2765,7 +2765,7 @@ MonoBehaviour:
     cardBackgroundTint: {r: 0.14, g: 0.1, b: 0.08, a: 0.96}
     cardAccentTint: {r: 1, g: 0.55, b: 0.22, a: 1}
   singleTargetPresentation:
-    displayName: 单体塔
+    displayName: Defense
     cardRoleSummary: Focus Fire / Frontline
     selectionHint: Reliable direct damage for finishing one target at a time.
     upgradeFocusSummary: Upgrades push faster fire, longer reach, and steadier single-target
@@ -2776,7 +2776,7 @@ MonoBehaviour:
     cardBackgroundTint: {r: 0.07, g: 0.11, b: 0.16, a: 0.96}
     cardAccentTint: {r: 0.28, g: 0.78, b: 1, a: 1}
   slowFieldPresentation:
-    displayName: 减速塔
+    displayName: Slow Field
     cardRoleSummary: Area Control / Slow
     selectionHint: Controls lanes by slowing every enemy inside the field.
     upgradeFocusSummary: Upgrades strengthen the slow, extend control time, and improve
@@ -2787,7 +2787,7 @@ MonoBehaviour:
     cardBackgroundTint: {r: 0.07, g: 0.14, b: 0.14, a: 0.96}
     cardAccentTint: {r: 0.36, g: 0.95, b: 0.84, a: 1}
   bombardPresentation:
-    displayName: 炸弹塔
+    displayName: Bombard
     cardRoleSummary: Burst Splash / Delayed
     selectionHint: Delayed splash damage that punishes clustered enemies at range.
     upgradeFocusSummary: Upgrades widen the blast, shorten bomb travel, and raise
@@ -5733,7 +5733,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: R
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -6120,9 +6120,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 取消
+  m_text: Cancel
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -7366,7 +7366,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Base HP: 0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 1300775204}
   m_fontSharedMaterials:
   - {fileID: 1300775204}
@@ -8097,9 +8097,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 基地失守。
+  m_text: Base lost.
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 0}
   m_sharedMaterial: {fileID: 0}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -8290,8 +8290,8 @@ Transform:
   m_GameObject: {fileID: 787983071}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 13.5, y: -1.5, z: 0}
-  m_LocalScale: {x: 8.5, y: 1.8, z: 1}
+  m_LocalPosition: {x: 2, y: -1.5, z: 0}
+  m_LocalScale: {x: 16.8, y: 1.8, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 370689861}
@@ -9084,7 +9084,7 @@ Transform:
   m_GameObject: {fileID: 827798741}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 17, y: -1.5, z: 0}
+  m_LocalPosition: {x: 18, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9542,9 +9542,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 继电器 (30)
+  m_text: Relay (30)
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -10734,10 +10734,10 @@ MonoBehaviour:
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
-      m_Calls: []
-  m_text: 样例路线 / 测试
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_text: OP-01 / TEST ROUTE
+  m_text: OP-01 / TEST ROUTE
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -11295,10 +11295,10 @@ MonoBehaviour:
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
-      m_Calls: []
-  m_text: 单体塔 (45)
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_text: Defense (45)
+  m_text: Defense (45)
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -11432,7 +11432,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: D
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -13120,7 +13120,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Selected: None'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 1112010111}
   m_fontSharedMaterials:
   - {fileID: 1112010111}
@@ -13586,8 +13586,8 @@ Transform:
   m_GameObject: {fileID: 1404116253}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 6, y: 1.8, z: 0}
-  m_LocalScale: {x: 8, y: 1.8, z: 1}
+  m_LocalPosition: {x: 2, y: 0.85, z: 0}
+  m_LocalScale: {x: 1.8, y: 4.9, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 370689861}
@@ -13854,7 +13854,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Wave: 0/0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 1030198997}
   m_fontSharedMaterials:
   - {fileID: 1030198997}
@@ -14153,10 +14153,10 @@ MonoBehaviour:
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
-      m_Calls: []
-  m_text: 战斗失败
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_text: GAME OVER
+  m_text: GAME OVER
+  m_fontAsset: {fileID: 0}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 0}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -14467,10 +14467,10 @@ MonoBehaviour:
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
-      m_Calls: []
-  m_text: 部署
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_text: DEPLOY
+  m_text: DEPLOY
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -17261,10 +17261,10 @@ MonoBehaviour:
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
-      m_Calls: []
-  m_text: 单体塔
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_text: Defense
+  m_text: Defense
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -17623,7 +17623,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   towerType: 2
-  hoverHint: 拖拽卡片可预览合法区域。继电器可以放在任意空地上，战斗塔必须放在继电器覆盖范围内。
+  hoverHint: Drag the card to preview legal areas. Place relays on any empty ground,
     then deploy turrets inside relay coverage.
   backgroundImageReference: {fileID: 1735439457}
   iconImageReference: {fileID: 312683310}
@@ -17865,17 +17865,37 @@ MonoBehaviour:
   initialDelay: 1.5
   delayBetweenWaves: 4
   routePreviewLeadTime: 2
-  continueCampaignAfterClear: 1
-  clearContinuePrimaryKey: 13
-  clearContinueSecondaryKey: 32
-  clearContinueMessage: 战斗段已完成。按 Enter / Space 继续后续剧情。
   battlefieldMapReference: {fileID: 2109000002}
-  waveCatalogAsset: {fileID: 11400000, guid: 4c50f316ff43519ccbee8a8abb949434, type: 2}
-  enemyCatalogAsset: {fileID: 11400000, guid: 819dd0e8f3ce43b486231f9495890f82, type: 2}
   enemyPathReference: {fileID: 883511605}
   enemyPrototypeReference: {fileID: 5863667738006183233, guid: 188b0c4095b17be4d9ca76d998df24f1, type: 3}
   enemyRootReference: {fileID: 2035091432}
-  waves: []
+  enemyRootName: EnemiesRoot
+  waves:
+  - enemyCount: 7
+    spawnInterval: 0.88
+    moveSpeed: 2.2
+    enemyHealth: 6
+    enemyScrapReward: 11
+  - enemyCount: 10
+    spawnInterval: 0.74
+    moveSpeed: 2.5
+    enemyHealth: 8
+    enemyScrapReward: 14
+  - enemyCount: 14
+    spawnInterval: 0.64
+    moveSpeed: 2.8
+    enemyHealth: 10
+    enemyScrapReward: 18
+  - enemyCount: 18
+    spawnInterval: 0.56
+    moveSpeed: 3.05
+    enemyHealth: 12
+    enemyScrapReward: 23
+  - enemyCount: 22
+    spawnInterval: 0.5
+    moveSpeed: 3.25
+    enemyHealth: 15
+    enemyScrapReward: 28
 --- !u!1 &1759276076
 GameObject:
   m_ObjectHideFlags: 0
@@ -18579,9 +18599,9 @@ MonoBehaviour:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1807522930}
   m_Enabled: 1
-  m_EditorHideFlags: 0
+  m_text: DEPLOY
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -18591,9 +18611,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 部署
+  m_text: DEPLOY
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 1315430162}
   m_fontSharedMaterials:
   - {fileID: 1315430162}
@@ -20062,9 +20082,9 @@ MonoBehaviour:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2065148644}
   m_Enabled: 1
-  m_EditorHideFlags: 0
+  m_text: Relay
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -20074,9 +20094,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 继电器
+  m_text: Relay
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -20425,15 +20445,15 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2100011001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 25ce30304182a364a88f932310c511f3, type: 3}
-  m_Name: 
   m_EditorClassIdentifier: 
   towerType: 3
-  hoverHint: 拖拽卡片可预览合法区域。减速塔必须放在继电器覆盖范围内。
+  hoverHint: Drag the card to preview legal areas. Slow field towers need relay coverage
     and hinder every enemy in range.
+  backgroundImageReference: {fileID: 2100011004}
+  iconImageReference: {fileID: 2100011022}
+  accentGraphicReferences:
+  - {fileID: 2100011022}
+  draggingAlpha: 0.82
   backgroundImageReference: {fileID: 2100011004}
   iconImageReference: {fileID: 2100011022}
   accentGraphicReferences:
@@ -20488,9 +20508,9 @@ MonoBehaviour:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2100011010}
   m_Enabled: 1
-  m_EditorHideFlags: 0
+  m_text: Slow Field
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -20500,9 +20520,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 减速塔
+  m_text: Slow Field
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -20712,7 +20732,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: S
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -20916,15 +20936,15 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2100012001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 25ce30304182a364a88f932310c511f3, type: 3}
-  m_Name: 
   m_EditorClassIdentifier: 
   towerType: 4
-  hoverHint: 拖拽卡片可预览合法区域。炸弹塔必须放在继电器覆盖范围内。
+  hoverHint: Drag the card to preview legal areas. Bombard towers need relay coverage
     and strike after a short travel delay.
+  backgroundImageReference: {fileID: 2100012004}
+  iconImageReference: {fileID: 2100012022}
+  accentGraphicReferences:
+  - {fileID: 2100012022}
+  draggingAlpha: 0.82
   backgroundImageReference: {fileID: 2100012004}
   iconImageReference: {fileID: 2100012022}
   accentGraphicReferences:
@@ -20979,9 +20999,9 @@ MonoBehaviour:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2100012010}
   m_Enabled: 1
-  m_EditorHideFlags: 0
+  m_text: Bombard
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -20991,9 +21011,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 炸弹塔
+  m_text: Bombard
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -21203,7 +21223,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: B
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f6e63696f4e52e344b3de1bc53f5dd99, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -21507,7 +21527,7 @@ Transform:
   m_GameObject: {fileID: 2109000010}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -19.8, y: 6.5, z: 0}
+  m_LocalPosition: {x: -19, y: 6.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -21570,7 +21590,7 @@ Transform:
   m_GameObject: {fileID: 2109000020}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -19.8, y: -6.5, z: 0}
+  m_LocalPosition: {x: -13, y: -6.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -21758,7 +21778,7 @@ Transform:
   m_GameObject: {fileID: 2109000050}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -19, y: -6.5, z: 0}
+  m_LocalPosition: {x: -13, y: -6.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21789,7 +21809,7 @@ Transform:
   m_GameObject: {fileID: 2109000060}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13, y: -6.5, z: 0}
+  m_LocalPosition: {x: -13, y: -3.2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21820,7 +21840,7 @@ Transform:
   m_GameObject: {fileID: 2109000070}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13, y: -3.2, z: 0}
+  m_LocalPosition: {x: 2, y: -3.2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21851,7 +21871,7 @@ Transform:
   m_GameObject: {fileID: 2109000080}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2, y: -3.2, z: 0}
+  m_LocalPosition: {x: 2, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21882,7 +21902,7 @@ Transform:
   m_GameObject: {fileID: 2109000090}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 10, y: -2.2, z: 0}
+  m_LocalPosition: {x: 2, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21913,7 +21933,7 @@ Transform:
   m_GameObject: {fileID: 2109000100}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 17, y: -1.5, z: 0}
+  m_LocalPosition: {x: 18, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -23036,7 +23056,7 @@ Transform:
   m_GameObject: {fileID: 2109000180}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 8, y: 1.5, z: 0}
+  m_LocalPosition: {x: 5, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -23067,7 +23087,7 @@ Transform:
   m_GameObject: {fileID: 2109000190}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 12, y: -0.6, z: 0}
+  m_LocalPosition: {x: 12, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -23098,7 +23118,7 @@ Transform:
   m_GameObject: {fileID: 2109000200}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 17, y: -1.5, z: 0}
+  m_LocalPosition: {x: 18, y: -1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -23422,8 +23442,8 @@ Transform:
   m_GameObject: {fileID: 2109000230}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 8, y: 1, z: 0}
-  m_LocalScale: {x: 6.5, y: 1.8, z: 1}
+  m_LocalPosition: {x: 5, y: 1.15, z: 0}
+  m_LocalScale: {x: 1.8, y: 6.0, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 370689861}
