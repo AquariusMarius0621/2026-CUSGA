@@ -91,6 +91,13 @@ public class EnemyPath : MonoBehaviour
         }
 
         CacheWaypoints();
+
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
@@ -108,6 +115,13 @@ public class EnemyPath : MonoBehaviour
         }
 
         CacheWaypoints();
+
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
@@ -138,6 +152,13 @@ public class EnemyPath : MonoBehaviour
         }
 
         CacheWaypoints();
+
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
@@ -251,6 +272,12 @@ public class EnemyPath : MonoBehaviour
     private void OnDrawGizmos()
     {
         CacheWaypoints();
+
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            return;
+        }
+
         RefreshReadabilityVisuals(force: false);
 
         Gizmos.color = new Color(1f, 0.35f, 0.2f, 1f);
@@ -281,6 +308,12 @@ public class EnemyPath : MonoBehaviour
     /// </summary>
     private void RefreshReadabilityVisuals(bool force)
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         if (!ShouldShowReadabilityOverlay())
         {
             Transform readabilityRoot = ResolveReadabilityRoot(allowCreate: false);
@@ -325,6 +358,13 @@ public class EnemyPath : MonoBehaviour
 
     public void EditorRefreshAuthoringState()
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            CacheWaypoints();
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         CacheWaypoints();
         RefreshReadabilityVisuals(force: true);
     }
@@ -342,6 +382,17 @@ public class EnemyPath : MonoBehaviour
         }
 
         return _runtimeReadabilityVisible;
+    }
+
+    /// <summary>
+    /// Returns true while an editor tool is intentionally restructuring the scene in bulk.
+    ///
+    /// This keeps `OnValidate` helper regeneration from fighting the authoring tool mid-edit.
+    /// The tool will refresh visuals explicitly once the structural work is complete.
+    /// </summary>
+    private static bool ShouldSkipAuthoringReadabilityRefresh()
+    {
+        return !Application.isPlaying && BattlefieldAuthoringGuard.IsReadabilityRefreshSuppressed;
     }
 
     /// <summary>
@@ -773,5 +824,55 @@ public static class BattlefieldReadabilityVisualUtility
             name = "BattlefieldReadabilityLineMaterial"
         };
         return s_sharedLineMaterial;
+    }
+}
+
+/// <summary>
+/// Centralizes temporary editor-only suppression switches used during large scene authoring passes.
+///
+/// Why this helper lives beside the map authoring scripts:
+/// 1. the route blueprint applier and future topology tools modify many scene objects at once,
+/// 2. path / gate / defense-point components all rebuild readability visuals during validation,
+/// 3. those automatic rebuilds are useful in normal editing, but disruptive during bulk edits.
+///
+/// The workflow becomes:
+/// - enter one suppression scope,
+/// - restructure the scene,
+/// - leave the scope,
+/// - refresh authoring visuals explicitly once.
+///
+/// This keeps the behavior deterministic without introducing any runtime dependency on editor code.
+/// </summary>
+public static class BattlefieldAuthoringGuard
+{
+    private static int s_readabilitySuppressionDepth;
+
+    /// <summary>
+    /// True while an editor tool is intentionally performing a large structural edit.
+    /// </summary>
+    public static bool IsReadabilityRefreshSuppressed => s_readabilitySuppressionDepth > 0;
+
+    /// <summary>
+    /// Begins one nested suppression scope.
+    /// Depth counting matters because several tools may compose other helpers internally.
+    /// </summary>
+    public static System.IDisposable BeginReadabilitySuppressionScope()
+    {
+        s_readabilitySuppressionDepth++;
+        return new ReadabilitySuppressionScope();
+    }
+
+    private readonly struct ReadabilitySuppressionScope : System.IDisposable
+    {
+        public void Dispose()
+        {
+            if (s_readabilitySuppressionDepth <= 0)
+            {
+                s_readabilitySuppressionDepth = 0;
+                return;
+            }
+
+            s_readabilitySuppressionDepth--;
+        }
     }
 }

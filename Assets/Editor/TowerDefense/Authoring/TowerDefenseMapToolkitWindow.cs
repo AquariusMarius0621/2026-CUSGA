@@ -835,6 +835,11 @@ namespace TowerDefense.Editor
                 return rows;
             }
 
+             if (waveSpawner.WaveCatalogAsset != null && waveSpawner.EnemyCatalogAsset != null && waveSpawner.WaveCatalogAsset.Waves.Length > 0)
+            {
+                return BuildWavePreviewFromCatalog(waveSpawner.WaveCatalogAsset, waveSpawner.EnemyCatalogAsset, mapDefinition);
+            }
+
             SerializedObject serializedSpawner = new SerializedObject(waveSpawner);
             SerializedProperty wavesProperty = serializedSpawner.FindProperty("waves");
             if (wavesProperty == null || !wavesProperty.isArray)
@@ -1156,6 +1161,7 @@ namespace TowerDefense.Editor
         [SerializeField] private Color brushPreviewColor = new Color(1f, 0.5f, 0.2f, 0.18f);
         [SerializeField] private bool brushActive;
         [SerializeField] private string healthReportFolder = "Assets/Docs/MapHealthReports";
+        [SerializeField] private string levelReportFolder = "Assets/Docs/LevelReports";
         [SerializeField] private bool showHealthInfoIssues = true;
         [SerializeField] private bool showHealthWarningIssues = true;
         [SerializeField] private bool showHealthErrorIssues = true;
@@ -1407,6 +1413,7 @@ namespace TowerDefense.Editor
             EditorGUILayout.LabelField("Level Health Checker", EditorStyles.boldLabel);
             runHudComparisonAgainstSample = EditorGUILayout.Toggle("Compare HUD Against SampleScene", runHudComparisonAgainstSample);
             healthReportFolder = EditorGUILayout.TextField("Health Report Folder", healthReportFolder);
+            levelReportFolder = EditorGUILayout.TextField("Level Report Folder", levelReportFolder);
             EditorGUILayout.LabelField("Severity Filter", EditorStyles.miniBoldLabel);
             EditorGUILayout.BeginHorizontal();
             showHealthErrorIssues = EditorGUILayout.ToggleLeft("Error", showHealthErrorIssues, GUILayout.Width(90f));
@@ -1428,6 +1435,14 @@ namespace TowerDefense.Editor
                 if (GUILayout.Button("Export Findings Markdown"))
                 {
                     ExportHealthCheckReport();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(targetMap == null && targetWaveSpawner == null))
+            {
+                if (GUILayout.Button("Export Level Design Report"))
+                {
+                    ExportLevelDesignReport();
                 }
             }
 
@@ -2319,6 +2334,31 @@ namespace TowerDefense.Editor
             System.IO.File.WriteAllLines(absolutePath, lines);
             AssetDatabase.Refresh();
             Debug.Log($"[MapToolkit] Health report exported: {assetPath}");
+        }
+
+        /// <summary>
+        /// Exports a planner-facing report instead of a pure issue checklist.
+        /// </summary>
+        private void ExportLevelDesignReport()
+        {
+            Scene activeScene = SceneManager.GetActiveScene();
+            BattlefieldMapDefinition effectiveMap = targetMap != null ? targetMap : TowerDefenseMapToolkitUtility.FindFirstComponentInScene<BattlefieldMapDefinition>(activeScene);
+            WaveSpawner effectiveWaveSpawner = targetWaveSpawner != null ? targetWaveSpawner : TowerDefenseMapToolkitUtility.FindFirstComponentInScene<WaveSpawner>(activeScene);
+
+            string folderPath = string.IsNullOrWhiteSpace(levelReportFolder) ? "Assets/Docs/LevelReports" : levelReportFolder;
+            string absoluteFolderPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), folderPath.Replace('/', System.IO.Path.DirectorySeparatorChar));
+            System.IO.Directory.CreateDirectory(absoluteFolderPath);
+
+            string sceneName = !string.IsNullOrWhiteSpace(activeScene.name) ? activeScene.name : "Scene";
+            string safeSceneName = string.Concat(sceneName.Select(character => char.IsLetterOrDigit(character) ? character : '_'));
+            string fileName = $"{safeSceneName}_LevelDesignReport_{DateTime.Now:yyyyMMdd_HHmmss}.md";
+            string assetPath = $"{folderPath.TrimEnd('/')}/{fileName}";
+            string absolutePath = System.IO.Path.Combine(absoluteFolderPath, fileName);
+
+            string markdown = LevelDesignReportBuilder.BuildMarkdown(activeScene, effectiveMap, effectiveWaveSpawner);
+            System.IO.File.WriteAllText(absolutePath, markdown);
+            AssetDatabase.Refresh();
+            Debug.Log($"[MapToolkit] Level design report exported: {assetPath}");
         }
 
         private void OnSceneViewGui(SceneView sceneView)

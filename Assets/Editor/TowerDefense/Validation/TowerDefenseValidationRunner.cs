@@ -1,36 +1,91 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace TowerDefense.Editor
 {
     /// <summary>
-    /// 这个批处理验证器负责在人工检查之外，再拦一层结构性错误。
+    /// Runs automated structural checks across the shared prototype scenes.
     ///
-    /// 当前重点检查：
-    /// 1. MainMenu 是否还保有基础 UI 引用
-    /// 2. SampleScene 的原型层级和关键运行时引用是否正确
-    /// 3. 三种战斗塔是否都已经有各自独立的运行时 prefab
-    /// 4. 继电器覆盖判定是否仍是正方形
+    /// Why this validator exists:
+    /// 1. `SampleScene` is still the gameplay shell template for later maps.
+    /// 2. `Level02 ~ Level04` now diverge in route topology and gate / defense-point counts.
+    /// 3. Once scenes become larger and more hand-authored, "looks okay in Scene view" is no
+    ///    longer enough to trust the map contract.
+    ///
+    /// The validator therefore checks two layers:
+    /// - shared shell integrity (prefabs, menu wiring, prototype scene references)
+    /// - per-level topology integrity (gate counts, defense-point counts, route alignment)
     /// </summary>
     public static class TowerDefenseValidationRunner
     {
-        private const string SampleScenePath = "Assets/Scenes/SampleScene.unity"; // 中文：Sample场景路径
-        private const string MainMenuScenePath = "Assets/Scenes/MainMenu.unity"; // 中文：主菜单场景路径
-        private const string RelayPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/RelayTowerPrototype.prefab"; // 中文：继电器预制体路径
-        private const string SingleTargetPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/SingleTargetTowerPrototype.prefab"; // 中文：单体目标预制体路径
-        private const string SlowFieldPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/SlowFieldTowerPrototype.prefab"; // 中文：减速区域预制体路径
-        private const string BombardPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/BombardTowerPrototype.prefab"; // 中文：炸弹预制体路径
-        private const string EnemyPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/EnemyPrototype.prefab"; // 中文：敌人预制体路径
-        private const string ShotTracePrefabPath = "Assets/Prefabs/TowerDefense/Vfx/ShotTrace.prefab"; // 中文：Shot轨迹预制体路径
-        private const string SlowPulsePrefabPath = "Assets/Prefabs/TowerDefense/Vfx/SlowPulse.prefab"; // 中文：减速脉冲预制体路径
-        private const string BombProjectilePrefabPath = "Assets/Prefabs/TowerDefense/Vfx/BombProjectile.prefab"; // 中文：炸弹投射物预制体路径
-        private const string BombExplosionPrefabPath = "Assets/Prefabs/TowerDefense/Vfx/BombExplosion.prefab"; // 中文：炸弹爆炸预制体路径
+        private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
+        private const string MainMenuScenePath = "Assets/Scenes/MainMenu.unity";
+        private const string Level02ScenePath = "Assets/Scenes/Level02.unity";
+        private const string Level03ScenePath = "Assets/Scenes/Level03.unity";
+        private const string Level04ScenePath = "Assets/Scenes/Level04.unity";
 
+        private const string RelayPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/RelayTowerPrototype.prefab";
+        private const string SingleTargetPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/SingleTargetTowerPrototype.prefab";
+        private const string SlowFieldPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/SlowFieldTowerPrototype.prefab";
+        private const string BombardPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/BombardTowerPrototype.prefab";
+        private const string EnemyPrefabPath = "Assets/Prefabs/TowerDefense/Runtime/EnemyPrototype.prefab";
+        private const string ShotTracePrefabPath = "Assets/Prefabs/TowerDefense/Vfx/ShotTrace.prefab";
+        private const string SlowPulsePrefabPath = "Assets/Prefabs/TowerDefense/Vfx/SlowPulse.prefab";
+        private const string BombProjectilePrefabPath = "Assets/Prefabs/TowerDefense/Vfx/BombProjectile.prefab";
+        private const string BombExplosionPrefabPath = "Assets/Prefabs/TowerDefense/Vfx/BombExplosion.prefab";
+
+        private const float EndpointTolerance = 0.35f;
+        private const float AlignmentTolerance = 0.45f;
+        private const int AlignmentSamplesPerSpan = 10;
+
+        private sealed class LevelSceneExpectation
+        {
+            public string ScenePath;
+            public int RequiredSpawnGateCount;
+            public int RequiredDefensePointCount;
+            public int RequiredPathCount;
+            public bool RequireWaveSpawner;
+        }
+
+        private static readonly LevelSceneExpectation[] LevelExpectations =
+        {
+            new LevelSceneExpectation
+            {
+                ScenePath = Level02ScenePath,
+                RequiredSpawnGateCount = 2,
+                RequiredDefensePointCount = 1,
+                RequiredPathCount = 2,
+                RequireWaveSpawner = true
+            },
+            new LevelSceneExpectation
+            {
+                ScenePath = Level03ScenePath,
+                RequiredSpawnGateCount = 3,
+                RequiredDefensePointCount = 1,
+                RequiredPathCount = 3,
+                RequireWaveSpawner = true
+            },
+            new LevelSceneExpectation
+            {
+                ScenePath = Level04ScenePath,
+                RequiredSpawnGateCount = 4,
+                RequiredDefensePointCount = 2,
+                RequiredPathCount = 4,
+                RequireWaveSpawner = true
+            }
+        };
+
+        /// <summary>
+        /// Batch-mode entry point used by CI-style checks and local one-shot verification.
+        /// </summary>
         public static void RunAll()
         {
             try
@@ -39,6 +94,7 @@ namespace TowerDefense.Editor
                 ValidatePrefabAssets();
                 ValidateSampleSceneStructure();
                 ValidateRelayCoverageShape();
+                ValidateAuthoredLevelScenes();
                 Debug.Log("TowerDefenseValidationRunner: all automated checks passed.");
             }
             catch (Exception exception)
@@ -48,6 +104,18 @@ namespace TowerDefense.Editor
                 return;
             }
 
+            EditorApplication.Exit(0);
+        }
+
+        /// <summary>
+        /// Tiny batch entry used only to prove that the editor assembly can compile and load.
+        ///
+        /// We keep this separate from the full validator because map scenes can legitimately fail
+        /// gameplay-contract checks while the editor tooling itself is still syntactically valid.
+        /// </summary>
+        public static void CompilationSmokeCheck()
+        {
+            Debug.Log("TowerDefenseValidationRunner: editor compilation smoke check loaded successfully.");
             EditorApplication.Exit(0);
         }
 
@@ -185,6 +253,262 @@ namespace TowerDefense.Editor
             }
         }
 
+        /// <summary>
+        /// Validates all authored combat maps beyond the shared template scene.
+        /// </summary>
+        private static void ValidateAuthoredLevelScenes()
+        {
+            List<string> allFailures = new List<string>();
+            foreach (LevelSceneExpectation expectation in LevelExpectations)
+            {
+                allFailures.AddRange(ValidateLevelScene(expectation));
+            }
+
+            if (allFailures.Count > 0)
+            {
+                StringBuilder builder = new StringBuilder();
+                builder.AppendLine("One or more authored level scenes failed validation:");
+                foreach (string failure in allFailures)
+                {
+                    builder.AppendLine($"- {failure}");
+                }
+
+                throw new InvalidOperationException(builder.ToString());
+            }
+        }
+
+        private static List<string> ValidateLevelScene(LevelSceneExpectation expectation)
+        {
+            EditorSceneManager.OpenScene(expectation.ScenePath, OpenSceneMode.Single);
+            Scene activeScene = SceneManager.GetActiveScene();
+            string sceneName = activeScene.name;
+
+            List<string> failures = new List<string>();
+
+            TowerDefenseGame towerDefenseGame = TowerDefenseMapToolkitUtility.FindFirstComponentInScene<TowerDefenseGame>(activeScene);
+            BattlefieldMapDefinition mapDefinition = TowerDefenseMapToolkitUtility.FindFirstComponentInScene<BattlefieldMapDefinition>(activeScene);
+            BuildZone buildZone = TowerDefenseMapToolkitUtility.FindFirstComponentInScene<BuildZone>(activeScene);
+            Camera mainCamera = TowerDefenseMapToolkitUtility.FindFirstComponentInScene<Camera>(activeScene);
+            WaveSpawner waveSpawner = TowerDefenseMapToolkitUtility.FindFirstComponentInScene<WaveSpawner>(activeScene);
+
+            if (towerDefenseGame == null)
+            {
+                failures.Add($"{sceneName}: missing TowerDefenseGame.");
+            }
+
+            if (mapDefinition == null)
+            {
+                failures.Add($"{sceneName}: missing BattlefieldMapDefinition.");
+            }
+
+            if (buildZone == null)
+            {
+                failures.Add($"{sceneName}: missing BuildZone.");
+            }
+
+            if (mainCamera == null)
+            {
+                failures.Add($"{sceneName}: missing main Camera.");
+            }
+
+            if (expectation.RequireWaveSpawner && waveSpawner == null)
+            {
+                failures.Add($"{sceneName}: missing WaveSpawner.");
+            }
+
+            if (mapDefinition == null)
+            {
+                return failures;
+            }
+
+            mapDefinition.CollectSceneReferences();
+
+            List<EnemySpawnGate> allSpawnGates = activeScene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<EnemySpawnGate>(true))
+                .Where(gate => gate != null)
+                .Distinct()
+                .OrderBy(gate => gate.name, StringComparer.Ordinal)
+                .ToList();
+
+            List<DefensePointFlag> allDefensePoints = activeScene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<DefensePointFlag>(true))
+                .Where(point => point != null)
+                .Distinct()
+                .OrderBy(point => point.name, StringComparer.Ordinal)
+                .ToList();
+
+            List<EnemyPath> allEnemyPaths = activeScene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<EnemyPath>(true))
+                .Where(path => path != null)
+                .Distinct()
+                .OrderBy(path => path.name, StringComparer.Ordinal)
+                .ToList();
+
+            List<PathSurfaceSegment> roadSegments = TowerDefenseMapToolkitUtility.CollectPathSurfaceSegments(activeScene);
+            if (roadSegments.Count == 0)
+            {
+                failures.Add($"{sceneName}: no authored PathSegment_ road strips were found.");
+            }
+
+            if (allSpawnGates.Count != expectation.RequiredSpawnGateCount)
+            {
+                failures.Add($"{sceneName}: expected exactly {expectation.RequiredSpawnGateCount} spawn gates, but found {allSpawnGates.Count}.");
+            }
+
+            if (allDefensePoints.Count != expectation.RequiredDefensePointCount)
+            {
+                failures.Add($"{sceneName}: expected exactly {expectation.RequiredDefensePointCount} defense points, but found {allDefensePoints.Count}.");
+            }
+
+            if (allEnemyPaths.Count != expectation.RequiredPathCount)
+            {
+                failures.Add($"{sceneName}: expected exactly {expectation.RequiredPathCount} enemy paths, but found {allEnemyPaths.Count}.");
+            }
+
+            if (allEnemyPaths.Select(path => path.name).Distinct(StringComparer.Ordinal).Count() != allEnemyPaths.Count)
+            {
+                failures.Add($"{sceneName}: duplicate EnemyPath object names were found.");
+            }
+
+            if (allSpawnGates.Select(gate => gate.name).Distinct(StringComparer.Ordinal).Count() != allSpawnGates.Count)
+            {
+                failures.Add($"{sceneName}: duplicate EnemySpawnGate object names were found.");
+            }
+
+            if (allDefensePoints.Select(point => point.name).Distinct(StringComparer.Ordinal).Count() != allDefensePoints.Count)
+            {
+                failures.Add($"{sceneName}: duplicate DefensePointFlag object names were found.");
+            }
+
+            HashSet<EnemyPath> pathsUsedByGates = new HashSet<EnemyPath>();
+            HashSet<DefensePointFlag> defensePointsUsedByGates = new HashSet<DefensePointFlag>();
+
+            foreach (EnemySpawnGate spawnGate in allSpawnGates)
+            {
+                if (spawnGate.EnemyPath == null)
+                {
+                    failures.Add($"{sceneName}: {spawnGate.name} is missing its EnemyPath reference.");
+                    continue;
+                }
+
+                if (!allEnemyPaths.Contains(spawnGate.EnemyPath))
+                {
+                    failures.Add($"{sceneName}: {spawnGate.name} points at an EnemyPath that is not part of the scene path set.");
+                }
+                else
+                {
+                    pathsUsedByGates.Add(spawnGate.EnemyPath);
+                }
+
+                if (spawnGate.TargetDefensePoint == null)
+                {
+                    failures.Add($"{sceneName}: {spawnGate.name} is missing its target DefensePointFlag reference.");
+                }
+                else if (!allDefensePoints.Contains(spawnGate.TargetDefensePoint))
+                {
+                    failures.Add($"{sceneName}: {spawnGate.name} points at a DefensePointFlag that is not part of the scene defense-point set.");
+                }
+                else
+                {
+                    defensePointsUsedByGates.Add(spawnGate.TargetDefensePoint);
+                }
+
+                float spawnOffset = Vector2.Distance(spawnGate.transform.position, spawnGate.GetSpawnPosition());
+                if (spawnOffset > EndpointTolerance)
+                {
+                    failures.Add($"{sceneName}: {spawnGate.name} is {spawnOffset:0.00} units away from the first waypoint it actually uses.");
+                }
+            }
+
+            foreach (EnemyPath enemyPath in allEnemyPaths)
+            {
+                List<Transform> waypoints = EnemyPathAuthoringUtility.GetWaypointChildren(enemyPath);
+                if (waypoints.Count < 2)
+                {
+                    failures.Add($"{sceneName}: {enemyPath.name} has fewer than 2 waypoint objects.");
+                    continue;
+                }
+
+                List<ToolkitIssue> alignmentIssues = TowerDefenseMapToolkitUtility.AnalyzeEnemyPathAlignment(
+                    enemyPath,
+                    roadSegments,
+                    AlignmentTolerance,
+                    AlignmentSamplesPerSpan);
+                foreach (ToolkitIssue issue in alignmentIssues.Where(issue => issue.Severity != ToolkitIssueSeverity.Info))
+                {
+                    failures.Add($"{sceneName}: {issue.Category} - {issue.Message}");
+                }
+            }
+
+            if (pathsUsedByGates.Count != expectation.RequiredPathCount)
+            {
+                failures.Add($"{sceneName}: expected {expectation.RequiredPathCount} gate-driven paths, but only {pathsUsedByGates.Count} unique paths are actually used by spawn gates.");
+            }
+
+            if (defensePointsUsedByGates.Count != expectation.RequiredDefensePointCount)
+            {
+                failures.Add($"{sceneName}: expected all {expectation.RequiredDefensePointCount} defense points to be targeted by at least one gate, but only {defensePointsUsedByGates.Count} are currently used.");
+            }
+
+            foreach (EnemyPath enemyPath in allEnemyPaths)
+            {
+                List<Transform> waypoints = EnemyPathAuthoringUtility.GetWaypointChildren(enemyPath);
+                if (waypoints.Count == 0)
+                {
+                    continue;
+                }
+
+                DefensePointFlag matchingTarget = allSpawnGates
+                    .Where(gate => gate != null && gate.EnemyPath == enemyPath)
+                    .Select(gate => gate.TargetDefensePoint)
+                    .FirstOrDefault(target => target != null);
+                if (matchingTarget == null)
+                {
+                    failures.Add($"{sceneName}: {enemyPath.name} is not targeted by any configured spawn gate.");
+                    continue;
+                }
+
+                float endDistance = Vector2.Distance(waypoints[waypoints.Count - 1].position, matchingTarget.WorldPosition);
+                if (endDistance > EndpointTolerance)
+                {
+                    failures.Add($"{sceneName}: {enemyPath.name} ends {endDistance:0.00} units away from its target defense point {matchingTarget.name}.");
+                }
+            }
+
+            if (waveSpawner != null)
+            {
+                SerializedObject serializedWaveSpawner = new SerializedObject(waveSpawner);
+                SerializedProperty fallbackMapProperty = serializedWaveSpawner.FindProperty("battlefieldMapReference");
+                SerializedProperty fallbackPathProperty = serializedWaveSpawner.FindProperty("enemyPathReference");
+
+                if (fallbackMapProperty != null && fallbackMapProperty.objectReferenceValue != null && fallbackMapProperty.objectReferenceValue != mapDefinition)
+                {
+                    failures.Add($"{sceneName}: WaveSpawner fallback battlefieldMapReference does not point at the scene's BattlefieldMapDefinition.");
+                }
+
+                if (fallbackPathProperty != null && fallbackPathProperty.objectReferenceValue != null)
+                {
+                    EnemyPath fallbackPath = fallbackPathProperty.objectReferenceValue as EnemyPath;
+                    if (fallbackPath == null || !allEnemyPaths.Contains(fallbackPath))
+                    {
+                        failures.Add($"{sceneName}: WaveSpawner fallback enemyPathReference points at a stale or non-scene EnemyPath.");
+                    }
+                }
+            }
+
+            if (towerDefenseGame != null)
+            {
+                SerializedObject serializedGame = new SerializedObject(towerDefenseGame);
+                SerializedProperty mapReferenceProperty = serializedGame.FindProperty("battlefieldMapReference");
+                if (mapReferenceProperty != null && mapReferenceProperty.objectReferenceValue != null && mapReferenceProperty.objectReferenceValue != mapDefinition)
+                {
+                    failures.Add($"{sceneName}: TowerDefenseGame battlefieldMapReference does not point at the scene's BattlefieldMapDefinition.");
+                }
+            }
+
+            return failures;
+        }
+
         private static void AssertOnlyExpectedFeedbackRoot(DefenseTower tower, string expectedChildName)
         {
             Transform feedbackRoot = GetPrivateField<Transform>(tower, "feedbackRootReference");
@@ -261,7 +585,7 @@ namespace TowerDefense.Editor
             FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             if (field == null)
             {
-                throw new MissingFieldException(target.GetType().Name, fieldName);
+                throw new InvalidOperationException($"Missing private field '{fieldName}' on {target.GetType().Name}.");
             }
 
             return (T)field.GetValue(target);

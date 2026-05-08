@@ -46,16 +46,34 @@ public sealed class DefensePointFlag : MonoBehaviour
 
     public void EditorRefreshAuthoringState()
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
     private void Awake()
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
     private void OnEnable()
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
@@ -70,11 +88,22 @@ public sealed class DefensePointFlag : MonoBehaviour
             }
         }
 
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         RefreshReadabilityVisuals(force: true);
     }
 
     private void OnDrawGizmos()
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            return;
+        }
+
         RefreshReadabilityVisuals(force: false);
 
         Gizmos.color = gizmoColor;
@@ -87,6 +116,12 @@ public sealed class DefensePointFlag : MonoBehaviour
     /// </summary>
     private void RefreshReadabilityVisuals(bool force)
     {
+        if (ShouldSkipAuthoringReadabilityRefresh())
+        {
+            _lastReadabilityHash = 0;
+            return;
+        }
+
         if (!showReadabilityMarker)
         {
             Transform readabilityRoot = ResolveReadabilityRoot(allowCreate: false);
@@ -107,6 +142,14 @@ public sealed class DefensePointFlag : MonoBehaviour
 
         _lastReadabilityHash = readabilityHash;
         RebuildReadabilityVisuals();
+    }
+
+    /// <summary>
+    /// Skips editor-only helper rebuilds while a bulk scene authoring tool is in control.
+    /// </summary>
+    private static bool ShouldSkipAuthoringReadabilityRefresh()
+    {
+        return !Application.isPlaying && BattlefieldAuthoringGuard.IsReadabilityRefreshSuppressed;
     }
 
     /// <summary>

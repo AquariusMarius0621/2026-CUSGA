@@ -136,6 +136,18 @@ namespace TowerDefense.Editor
         }
 
         /// <summary>
+        /// One-shot batch entry for the current level-polish workflow:
+        /// rebuild the authored route blueprints, then regenerate decorative road art.
+        /// </summary>
+        public static void ApplyAndPolishLevel03AndLevel04Batch()
+        {
+            ApplyLevel03AndLevel04BlueprintsBatch();
+            RoadArtAuthoringWindow.GenerateLevel03AndLevel04RoadArtBatch();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>
         /// Batch entry for the user's current request:
         /// rebuild only Level04 into the larger four-gate, two-defense-point layout.
         /// </summary>
@@ -149,7 +161,7 @@ namespace TowerDefense.Editor
         private static void ApplyLevel03AdvancedBlueprint()
         {
             Scene scene = EditorSceneManager.OpenScene(Level03ScenePath, OpenSceneMode.Single);
-            try
+            using (BattlefieldAuthoringGuard.BeginReadabilitySuppressionScope())
             {
                 BattlefieldMapDefinition map = FindRequiredComponent<BattlefieldMapDefinition>(scene, BattlefieldMapName);
                 BuildZone buildZone = FindRequiredComponent<BuildZone>(scene, BuildZoneName);
@@ -248,19 +260,16 @@ namespace TowerDefense.Editor
                     routes,
                     defenses,
                     relayLimit: 7);
+            }
 
-                EditorSceneManager.SaveScene(scene);
-            }
-            finally
-            {
-                EditorSceneManager.CloseScene(scene, true);
-            }
+            RefreshSceneAuthoringVisuals(scene);
+            EditorSceneManager.SaveScene(scene);
         }
 
         private static void ApplyLevel04ExpandedBlueprint()
         {
             Scene scene = EditorSceneManager.OpenScene(Level04ScenePath, OpenSceneMode.Single);
-            try
+            using (BattlefieldAuthoringGuard.BeginReadabilitySuppressionScope())
             {
                 BattlefieldMapDefinition map = FindRequiredComponent<BattlefieldMapDefinition>(scene, BattlefieldMapName);
                 BuildZone buildZone = FindRequiredComponent<BuildZone>(scene, BuildZoneName);
@@ -391,13 +400,10 @@ namespace TowerDefense.Editor
                     routes,
                     defenses,
                     relayLimit: 8);
+            }
 
-                EditorSceneManager.SaveScene(scene);
-            }
-            finally
-            {
-                EditorSceneManager.CloseScene(scene, true);
-            }
+            RefreshSceneAuthoringVisuals(scene);
+            EditorSceneManager.SaveScene(scene);
         }
 
         /// <summary>
@@ -443,6 +449,7 @@ namespace TowerDefense.Editor
             }
 
             EnemySpawnGate gateTemplate = FindFirstComponentInScene<EnemySpawnGate>(scene);
+            Dictionary<string, EnemySpawnGate> gateByName = new Dictionary<string, EnemySpawnGate>();
             foreach (RouteBlueprint route in routes)
             {
                 EnemySpawnGate spawnGate = GetOrDuplicateSpawnGate(gateTemplate, mapRoot, route.GateObjectName);
@@ -451,21 +458,13 @@ namespace TowerDefense.Editor
                     route,
                     pathByName[route.PathObjectName],
                     defenseByName[route.DefensePointObjectName]);
+                gateByName[route.GateObjectName] = spawnGate;
             }
 
             CleanupExtraComponents(mapRoot, routes, defenses);
             RebuildRoadSegmentsFromRoutes(pathVisualsRoot, routes);
-
-            // Keep the authored relay cap in sync with the intended difficulty spike.
-            SerializedObject serializedMap = new SerializedObject(map);
-            SerializedProperty relayLimitProperty = serializedMap.FindProperty("relayLimit");
-            if (relayLimitProperty != null)
-            {
-                relayLimitProperty.intValue = relayLimit;
-                serializedMap.ApplyModifiedPropertiesWithoutUndo();
-            }
-
-            map.CollectSceneReferences();
+            ApplyMapReferences(map, buildZone, routes, defenses, gateByName, defenseByName, relayLimit);
+            RewireSharedSceneControllers(scene, map, routes, pathByName);
             EditorUtility.SetDirty(map);
             EditorUtility.SetDirty(buildZone);
             EditorSceneManager.MarkSceneDirty(scene);
@@ -509,6 +508,118 @@ namespace TowerDefense.Editor
             foreach (DefensePointFlag extraDefensePoint in extraDefensePoints)
             {
                 Object.DestroyImmediate(extraDefensePoint.gameObject);
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds readability overlays once the structural scene edit is complete.
+        ///
+        /// During the bulk edit we intentionally suppress `OnValidate`-driven helper generation.
+        /// That keeps the scene stable while objects are being created, renamed, and rewired.
+        /// Once the structure is final, we explicitly refresh every author-facing map marker once.
+        /// </summary>
+        private static void RefreshSceneAuthoringVisuals(Scene scene)
+        {
+            foreach (EnemyPath enemyPath in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<EnemyPath>(true)))
+            {
+                enemyPath.EditorRefreshAuthoringState();
+                EditorUtility.SetDirty(enemyPath);
+            }
+
+            foreach (EnemySpawnGate spawnGate in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<EnemySpawnGate>(true)))
+            {
+                spawnGate.EditorRefreshAuthoringState();
+                EditorUtility.SetDirty(spawnGate);
+            }
+
+            foreach (DefensePointFlag defensePoint in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<DefensePointFlag>(true)))
+            {
+                defensePoint.EditorRefreshAuthoringState();
+                EditorUtility.SetDirty(defensePoint);
+            }
+        }
+
+        /// <summary>
+        /// Writes the authoritative map arrays in blueprint order instead of relying on incidental
+        /// hierarchy enumeration order.
+        /// </summary>
+        private static void ApplyMapReferences(
+            BattlefieldMapDefinition map,
+            BuildZone buildZone,
+            IReadOnlyList<RouteBlueprint> routes,
+            IReadOnlyList<DefenseBlueprint> defenses,
+            IReadOnlyDictionary<string, EnemySpawnGate> gateByName,
+            IReadOnlyDictionary<string, DefensePointFlag> defenseByName,
+            int relayLimit)
+        {
+            SerializedObject serializedMap = new SerializedObject(map);
+            SetObjectProperty(serializedMap, "buildZoneReference", buildZone);
+
+            SerializedProperty spawnGatesProperty = serializedMap.FindProperty("spawnGates");
+            if (spawnGatesProperty != null)
+            {
+                spawnGatesProperty.arraySize = routes.Count;
+                for (int index = 0; index < routes.Count; index++)
+                {
+                    spawnGatesProperty.GetArrayElementAtIndex(index).objectReferenceValue = gateByName[ routes[index].GateObjectName ];
+                }
+            }
+
+            SerializedProperty defensePointsProperty = serializedMap.FindProperty("defensePoints");
+            if (defensePointsProperty != null)
+            {
+                defensePointsProperty.arraySize = defenses.Count;
+                for (int index = 0; index < defenses.Count; index++)
+                {
+                    defensePointsProperty.GetArrayElementAtIndex(index).objectReferenceValue = defenseByName[ defenses[index].ObjectName ];
+                }
+            }
+
+            SerializedProperty relayLimitProperty = serializedMap.FindProperty("relayLimit");
+            if (relayLimitProperty != null)
+            {
+                relayLimitProperty.intValue = relayLimit;
+            }
+
+            serializedMap.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// Rebinds the shared controllers that still keep one scene-level fallback path reference.
+        ///
+        /// We keep the fallback path aligned to the first authored route so older systems do not
+        /// silently point at stale duplicate path roots after a major topology rewrite.
+        /// </summary>
+        private static void RewireSharedSceneControllers(
+            Scene scene,
+            BattlefieldMapDefinition map,
+            IReadOnlyList<RouteBlueprint> routes,
+            IReadOnlyDictionary<string, EnemyPath> pathByName)
+        {
+            if (routes.Count == 0)
+            {
+                return;
+            }
+
+            EnemyPath primaryPath = pathByName[routes[0].PathObjectName];
+
+            WaveSpawner waveSpawner = FindFirstComponentInScene<WaveSpawner>(scene);
+            if (waveSpawner != null)
+            {
+                SerializedObject serializedWaveSpawner = new SerializedObject(waveSpawner);
+                SetObjectProperty(serializedWaveSpawner, "battlefieldMapReference", map);
+                SetObjectProperty(serializedWaveSpawner, "enemyPathReference", primaryPath);
+                serializedWaveSpawner.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(waveSpawner);
+            }
+
+            TowerDefenseGame towerDefenseGame = FindFirstComponentInScene<TowerDefenseGame>(scene);
+            if (towerDefenseGame != null)
+            {
+                SerializedObject serializedGame = new SerializedObject(towerDefenseGame);
+                SetObjectProperty(serializedGame, "battlefieldMapReference", map);
+                serializedGame.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(towerDefenseGame);
             }
         }
 
@@ -651,39 +762,51 @@ namespace TowerDefense.Editor
 
         private static EnemyPath GetOrDuplicateEnemyPath(EnemyPath template, Transform parent, string objectName)
         {
-            EnemyPath existing = parent.GetComponentsInChildren<EnemyPath>(true).FirstOrDefault(path => path != null && path.name == objectName);
-            if (existing != null)
-            {
-                return existing;
-            }
-
-            EnemyPath duplicated = Object.Instantiate(template, parent);
-            duplicated.name = objectName;
-            return duplicated;
+            return FindOrCreateUniqueComponent(template, parent, objectName);
         }
 
         private static EnemySpawnGate GetOrDuplicateSpawnGate(EnemySpawnGate template, Transform parent, string objectName)
         {
-            EnemySpawnGate existing = parent.GetComponentsInChildren<EnemySpawnGate>(true).FirstOrDefault(gate => gate != null && gate.name == objectName);
-            if (existing != null)
-            {
-                return existing;
-            }
-
-            EnemySpawnGate duplicated = Object.Instantiate(template, parent);
-            duplicated.name = objectName;
-            return duplicated;
+            return FindOrCreateUniqueComponent(template, parent, objectName);
         }
 
         private static DefensePointFlag GetOrDuplicateDefensePoint(DefensePointFlag template, Transform parent, string objectName)
         {
-            DefensePointFlag existing = parent.GetComponentsInChildren<DefensePointFlag>(true).FirstOrDefault(point => point != null && point.name == objectName);
-            if (existing != null)
+            return FindOrCreateUniqueComponent(template, parent, objectName);
+        }
+
+        /// <summary>
+        /// Finds one authored object by name, destroys same-name duplicates, or duplicates a
+        /// template if the scene does not yet contain the requested object.
+        ///
+        /// Same-name duplicate cleanup is a key part of making blueprint application converge
+        /// reliably. Without it, repeated redesign passes can leave stale components behind while
+        /// still "looking" correct at a glance because one of the duplicates happens to be wired.
+        /// </summary>
+        private static T FindOrCreateUniqueComponent<T>(T template, Transform parent, string objectName) where T : Component
+        {
+            List<T> matchingComponents = parent.GetComponentsInChildren<T>(true)
+                .Where(component => component != null && component.name == objectName)
+                .ToList();
+
+            if (matchingComponents.Count > 0)
             {
-                return existing;
+                T retained = matchingComponents[0];
+                for (int index = 1; index < matchingComponents.Count; index++)
+                {
+                    Object.DestroyImmediate(matchingComponents[index].gameObject);
+                }
+
+                return retained;
             }
 
-            DefensePointFlag duplicated = Object.Instantiate(template, parent);
+            if (template == null)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot create '{objectName}' because no template of type '{typeof(T).Name}' exists in the scene.");
+            }
+
+            T duplicated = Object.Instantiate(template, parent);
             duplicated.name = objectName;
             return duplicated;
         }

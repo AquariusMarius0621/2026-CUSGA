@@ -139,7 +139,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4181001
 RectTransform:
   m_ObjectHideFlags: 0
@@ -27110,14 +27110,13 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 883511604}
-  - component: {fileID: 883511605}
   m_Layer: 0
-  m_Name: EnemyPath
+  m_Name: Legacy_EnemyPathArchive
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &883511604
 Transform:
   m_ObjectHideFlags: 0
@@ -27140,33 +27139,6 @@ Transform:
   - {fileID: 1194639117}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &883511605
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 883511603}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 34900c2bae271244aabbf989870b3233, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  waypointRootReference: {fileID: 0}
-  autoFindWaypointRoot: 1
-  showReadabilityOverlay: 1
-  autoCreateReadabilityRoot: 1
-  readabilityRootReference: {fileID: 1194639117}
-  readabilityMaterialOverride: {fileID: 0}
-  routeLineColor: {r: 1, g: 0.62, b: 0.26, a: 0.92}
-  routeArrowColor: {r: 1, g: 0.93, b: 0.72, a: 0.96}
-  hotspotColor: {r: 1, g: 0.52, b: 0.26, a: 0.92}
-  routeLineWidth: 0.22
-  arrowSpacing: 1.8
-  arrowSize: 0.38
-  hotspotRadius: 0.42
-  turnHotspotThreshold: 20
-  readabilitySortingOrder: 2
 --- !u!1 &885696777
 GameObject:
   m_ObjectHideFlags: 0
@@ -49639,7 +49611,10 @@ MonoBehaviour:
   delayBetweenWaves: 4
   routePreviewLeadTime: 2
   battlefieldMapReference: {fileID: 2109000002}
-  enemyPathReference: {fileID: 883511605}
+  waveCatalogAsset: {fileID: 11400000, guid: 3b40e205ee32408bbaff7f7faa838323, type: 2}
+  enemyCatalogAsset: {fileID: 11400000, guid: 819dd0e8f3ce43b486231f9495890f82, type: 2}
+  continueCampaignAfterClear: 0
+  enemyPathReference: {fileID: 507283869}
   enemyPrototypeReference: {fileID: 5863667738006183233, guid: 188b0c4095b17be4d9ca76d998df24f1, type: 3}
   enemyRootReference: {fileID: 2035091432}
   enemyRootName: EnemiesRoot
