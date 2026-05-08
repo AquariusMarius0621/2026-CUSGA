@@ -1,6 +1,6 @@
 # 美术替换工作流
 
-Updated: 2026-04-19
+Updated: 2026-04-20
 
 ## 这份文档是干什么的
 这份文档专门告诉你：
@@ -15,7 +15,7 @@ Updated: 2026-04-19
 让你以后换自己的美术资源时，尽量不需要重写玩法脚本。
 
 ## 最推荐的替换顺序
-1. 先换运行时原型的外观
+1. 先换运行时 Prefab 的外观，并把场景原型当结构对照
 2. 再换 UI 卡片和 HUD 样式
 3. 最后换地图场景装饰和路径表现
 
@@ -25,10 +25,41 @@ Updated: 2026-04-19
 - UI 只是显示入口，晚一点改不会影响玩法
 - 地图装饰最自由，放到最后最不容易返工
 
+## 运行时 Prefab 入口
+当前真正用于运行时生成的实体，已经整理到这些 Prefab 资产里：
+
+- `Assets/Prefabs/TowerDefense/Runtime/RelayTowerPrototype.prefab`
+- `Assets/Prefabs/TowerDefense/Runtime/SingleTargetTowerPrototype.prefab`
+- `Assets/Prefabs/TowerDefense/Runtime/SlowFieldTowerPrototype.prefab`
+- `Assets/Prefabs/TowerDefense/Runtime/BombardTowerPrototype.prefab`
+- `Assets/Prefabs/TowerDefense/Runtime/EnemyPrototype.prefab`
+
+战斗反馈也已经整理成单独的 Prefab 入口：
+
+- `Assets/Prefabs/TowerDefense/Vfx/ShotTrace.prefab`
+- `Assets/Prefabs/TowerDefense/Vfx/SlowPulse.prefab`
+- `Assets/Prefabs/TowerDefense/Vfx/BombProjectile.prefab`
+- `Assets/Prefabs/TowerDefense/Vfx/BombExplosion.prefab`
+
+这意味着你后面如果想直接替换“真正运行时会生成出来的实体美术”，
+优先改这些 Prefab 资产就行。
+
+`SampleScene / RuntimePrototypes` 下面那些对象现在更适合当作作者参考原型和结构对照。
+如果你刻意改了场景里的原型，并且想把它们重新同步回 Prefab，
+就需要重新执行编辑器工具 `TowerDefensePrefabAuthoringTool.BatchCreateOrUpdateRuntimePrefabs`。
+
 ## 一、替换塔的美术
 
 ### 1. 战斗塔
-在 `SampleScene` 里展开：
+先说明这一点：
+
+- `SampleScene / RuntimePrototypes / DefenseTowerPrototype` 现在更适合拿来对照层级和挂点
+- 真正运行时会生成的战斗塔，优先分别改：
+  - `Assets/Prefabs/TowerDefense/Runtime/SingleTargetTowerPrototype.prefab`
+  - `Assets/Prefabs/TowerDefense/Runtime/SlowFieldTowerPrototype.prefab`
+  - `Assets/Prefabs/TowerDefense/Runtime/BombardTowerPrototype.prefab`
+
+如果你只是想知道有哪些挂点，就先在 `SampleScene` 里展开：
 
 - `RuntimePrototypes`
 - `DefenseTowerPrototype`
@@ -43,15 +74,37 @@ Updated: 2026-04-19
 重点怎么改：
 
 - 想换塔本体外观：
-  直接改 `DefenseTowerPrototype` 上 `VisualRoot` 当前主 `SpriteRenderer`
-  现在脚本里实际入口是 `bodyRendererReference`
+  现在三种战斗塔已经支持各自独立主塔身 Sprite
+  不再只是共用一个主体图片。
+  重点改 `DefenseTower` 组件里三套 `CombatTuning` 各自的：
+  - `singleTargetTuning.bodySprite`
+  - `slowFieldTuning.bodySprite`
+  - `bombardTuning.bodySprite`
+
+  如果某一类没指定 `bodySprite`，
+  会自动回退到原型体当前默认主 Sprite，
+  所以老场景不会因为新增这个入口而突然丢图。
 - 想换攻击反馈：
-  改 `DefenseTower` 组件里三套 `CombatTuning`
-  重点字段：
-  - `shotTraceSprite`
-  - `slowPulseSprite`
-  - `bombProjectileSprite`
-  - `bombExplosionSprite`
+  现在建议优先改反馈 Prefab 资产本身：
+  - `Assets/Prefabs/TowerDefense/Vfx/ShotTrace.prefab`
+  - `Assets/Prefabs/TowerDefense/Vfx/SlowPulse.prefab`
+  - `Assets/Prefabs/TowerDefense/Vfx/BombProjectile.prefab`
+  - `Assets/Prefabs/TowerDefense/Vfx/BombExplosion.prefab`
+
+  如果你只是想让单体塔 tracer、炸弹塔飞行物、爆炸更明显，
+  这一步通常确实需要你自己补正式美术资源，或者至少调这些 Prefab 里的：
+  - `SpriteRenderer.sprite`
+  - `SpriteRenderer.color`
+  - `Transform.localScale`
+  - 你自己额外加的子物体、粒子或发光图层
+
+  `DefenseTower` 组件里的三套 `CombatTuning` 已经接好了对应入口：
+  - `singleTargetTuning.shotTracePrefab`
+  - `slowFieldTuning.slowPulsePrefab`
+  - `bombardTuning.bombProjectilePrefab`
+  - `bombardTuning.bombExplosionPrefab`
+
+  所以后面你主要是换 Prefab 资源，而不是改玩法逻辑。
 - 想调整反馈出现位置：
   改 `FeedbackRoot`
 - 想调整塔型签名位置：
@@ -60,6 +113,11 @@ Updated: 2026-04-19
   改 `LevelMarkerRoot`
 
 ### 2. 继电器
+同样建议这样理解：
+
+- `SampleScene / RuntimePrototypes / RelayTowerPrototype` 主要用于看结构和挂点
+- 真正运行时会生成的继电器，优先改 `Assets/Prefabs/TowerDefense/Runtime/RelayTowerPrototype.prefab`
+
 在 `SampleScene` 里展开：
 
 - `RuntimePrototypes`
@@ -90,9 +148,20 @@ Updated: 2026-04-19
 - `levelMarkerRootReference`
 - `visualRootReference`
 
+而且战斗塔主体外观本身也已经按塔类型分开到各自 tuning 里：
+
+- `singleTargetTuning.bodySprite`
+- `slowFieldTuning.bodySprite`
+- `bombardTuning.bodySprite`
+
 所以你改的是外观挂点，不是玩法算法。
 
 ## 二、替换敌人的美术
+
+同样地：
+
+- `SampleScene / RuntimePrototypes / EnemyPrototype` 主要用于看结构和挂点
+- 真正运行时会生成的敌人，优先改 `Assets/Prefabs/TowerDefense/Runtime/EnemyPrototype.prefab`
 
 在 `SampleScene` 里展开：
 
@@ -224,7 +293,20 @@ Updated: 2026-04-19
 
 - `showReadabilityOverlay`
 - `showReadabilityMarker`
+- `autoCreateReadabilityRoot`
+- `readabilityRootReference`
+- `readabilityMaterialOverride`
 - 各种颜色、宽度、半径、排序层级
+
+如果你后面想自己接管这一层的场景层级，最推荐的方式是：
+
+1. 先在对应对象下面自己建一个可读性根节点
+2. 再把这个根节点拖到：
+   - `readabilityRootReference`
+3. 如果你希望这些线框统一吃你自己的材质，再把材质拖到：
+   - `readabilityMaterialOverride`
+
+这样就不必完全依赖脚本自动创建隐藏根节点了。
 
 ### 3. 放置提示表现
 跟放置有关的视觉入口主要在 `GameController` 的 `TowerDefenseGame` 组件里：
@@ -302,11 +384,13 @@ Updated: 2026-04-19
 - 换主菜单配色和文案
 - 调整原型子节点位置
 - 调整场景对象排序和装饰
+- 替换运行时实体 Prefab 里的 Sprite、材质、颜色或子层级
 
 ## 七、最稳妥的实际操作顺序
 以后你自己替换资源时，建议按这个顺序来：
 
-1. 先改 `RuntimePrototypes`
+1. 先改 `Assets/Prefabs/TowerDefense/Runtime`
+   `RuntimePrototypes` 主要拿来对照层级与挂点；三种战斗塔现在已经拆成了各自独立 prefab，优先分别改它们自己的 prefab 和各自 `DefenseTower` 组件里的参数
 2. 再改 `GameController` 里的 `Tower Presentation` 和 `HUD Theme`
 3. 再改四张部署卡的图标和装饰
 4. 再改地图里的路径、出怪口、防御点装饰
