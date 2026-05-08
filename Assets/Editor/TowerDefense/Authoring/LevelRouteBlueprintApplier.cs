@@ -1,0 +1,761 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
+
+namespace TowerDefense.Editor
+{
+    /// <summary>
+    /// Applies large route blueprints into authored map scenes.
+    ///
+    /// Why this tool exists:
+    /// 1. Hand-editing long Unity YAML scene files is fragile once a route needs many waypoints.
+    /// 2. The user wants route complexity to grow in big steps, not by tiny manual nudges.
+    /// 3. Scene-authored maps still remain the source of truth, so we generate the scene layout
+    ///    directly instead of hiding the result behind runtime code.
+    ///
+    /// The tool deliberately edits only scene-authored map structure:
+    /// - spawn gates
+    /// - defense points
+    /// - enemy path roots and waypoints
+    /// - visible road strips
+    /// - build zone size
+    /// - camera view size
+    ///
+    /// It does not touch wave data, tower balance, or HUD wiring.
+    /// </summary>
+    public static class LevelRouteBlueprintApplier
+    {
+        private const string Level03ScenePath = "Assets/Scenes/Level03.unity";
+        private const string Level04ScenePath = "Assets/Scenes/Level04.unity";
+        private const string AutoRunMarkerPath = "Temp/level_route_blueprint_autorun.txt";
+
+        private const string BattlefieldMapName = "BattlefieldMap";
+        private const string BuildZoneName = "BuildZone";
+        private const string PathVisualsName = "PathVisuals";
+        private const string MainCameraName = "Main Camera";
+
+        /// <summary>
+        /// A minimal route description for one authored EnemyPath.
+        ///
+        /// We keep the blueprint data intentionally compact:
+        /// a name, one gate, one target defense point, and a waypoint list.
+        /// Road strips are derived from the waypoint spans so the scene stays consistent.
+        /// </summary>
+        private sealed class RouteBlueprint
+        {
+            public string GateObjectName;
+            public string GateId;
+            public string GateDisplayName;
+            public string PathObjectName;
+            public string[] WaypointNames;
+            public Vector2[] Waypoints;
+            public string DefensePointObjectName;
+        }
+
+        /// <summary>
+        /// A minimal defense point description.
+        /// </summary>
+        private sealed class DefenseBlueprint
+        {
+            public string ObjectName;
+            public string PointId;
+            public string DisplayName;
+            public Vector2 Position;
+        }
+
+        [MenuItem("Tools/Tower Defense/Authoring/Apply Level03 Advanced Blueprint")]
+        public static void ApplyLevel03AdvancedBlueprintMenu()
+        {
+            ApplyLevel03AdvancedBlueprint();
+        }
+
+        [MenuItem("Tools/Tower Defense/Authoring/Apply Level04 Expanded Blueprint")]
+        public static void ApplyLevel04ExpandedBlueprintMenu()
+        {
+            ApplyLevel04ExpandedBlueprint();
+        }
+
+        /// <summary>
+        /// Lets the already-open Unity editor apply the blueprint automatically once.
+        ///
+        /// Why this exists:
+        /// - batchmode can become flaky on large local editor setups
+        /// - the user often already has the project open in Unity while reviewing maps
+        /// - a marker-file driven one-shot keeps the behavior explicit and reversible
+        ///
+        /// We only run when the marker file exists, then delete it immediately after the attempt.
+        /// That prevents accidental reapplication on every domain reload.
+        /// </summary>
+        [InitializeOnLoadMethod]
+        private static void TryAutoRunPendingBlueprint()
+        {
+            EditorApplication.delayCall += () =>
+            {
+                if (!File.Exists(AutoRunMarkerPath))
+                {
+                    return;
+                }
+
+                try
+                {
+                    ApplyLevel03AndLevel04BlueprintsBatch();
+                    Debug.Log("[LevelRouteBlueprintApplier] Auto-run marker consumed successfully.");
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError($"[LevelRouteBlueprintApplier] Auto-run failed: {exception}");
+                }
+                finally
+                {
+                    if (File.Exists(AutoRunMarkerPath))
+                    {
+                        File.Delete(AutoRunMarkerPath);
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Batch entry used by `-executeMethod`.
+        ///
+        /// This lets us update both authored scenes in one Unity batch run while keeping the code
+        /// reusable from the normal editor menu.
+        /// </summary>
+        public static void ApplyLevel03AndLevel04BlueprintsBatch()
+        {
+            ApplyLevel03AdvancedBlueprint();
+            ApplyLevel04ExpandedBlueprint();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Batch entry for the user's current request:
+        /// rebuild only Level04 into the larger four-gate, two-defense-point layout.
+        /// </summary>
+        public static void ApplyLevel04BlueprintBatch()
+        {
+            ApplyLevel04ExpandedBlueprint();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        private static void ApplyLevel03AdvancedBlueprint()
+        {
+            Scene scene = EditorSceneManager.OpenScene(Level03ScenePath, OpenSceneMode.Single);
+            try
+            {
+                BattlefieldMapDefinition map = FindRequiredComponent<BattlefieldMapDefinition>(scene, BattlefieldMapName);
+                BuildZone buildZone = FindRequiredComponent<BuildZone>(scene, BuildZoneName);
+                Transform pathVisualsRoot = FindRequiredTransform(scene, PathVisualsName);
+                Camera mainCamera = FindRequiredComponent<Camera>(scene, MainCameraName);
+
+                // The new Level03 target is a much harder three-gate single-core map.
+                // The space is expanded so the three routes can stay separate for longer.
+                buildZone.transform.localScale = new Vector3(80f, 44f, 1f);
+                mainCamera.orthographicSize = 18.5f;
+
+                RouteBlueprint[] routes =
+                {
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_Main",
+                        GateId = "Gate_A",
+                        GateDisplayName = "Upper Main Spawn Gate",
+                        PathObjectName = "EnemyPath",
+                        DefensePointObjectName = "DefensePoint_Core",
+                        WaypointNames = BuildWaypointNames("Waypoint_", 10),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-32f, 14f),
+                            new Vector2(-20f, 14f),
+                            new Vector2(-20f, 6f),
+                            new Vector2(-2f, 6f),
+                            new Vector2(-2f, 14f),
+                            new Vector2(12f, 14f),
+                            new Vector2(12f, 0f),
+                            new Vector2(24f, 0f),
+                            new Vector2(24f, -12f),
+                            new Vector2(30f, -12f)
+                        }
+                    },
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_Alt",
+                        GateId = "Gate_B",
+                        GateDisplayName = "Lower Backstreet Spawn Gate",
+                        PathObjectName = "EnemyPath_B",
+                        DefensePointObjectName = "DefensePoint_Core",
+                        WaypointNames = BuildWaypointNames("Waypoint_B", 9),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-32f, -14f),
+                            new Vector2(-32f, -2f),
+                            new Vector2(-18f, -2f),
+                            new Vector2(-18f, -14f),
+                            new Vector2(4f, -14f),
+                            new Vector2(4f, -6f),
+                            new Vector2(16f, -6f),
+                            new Vector2(16f, -12f),
+                            new Vector2(30f, -12f)
+                        }
+                    },
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_Mid",
+                        GateId = "Gate_C",
+                        GateDisplayName = "Upper Mid Fast Spawn Gate",
+                        PathObjectName = "EnemyPath_C",
+                        DefensePointObjectName = "DefensePoint_Core",
+                        WaypointNames = BuildWaypointNames("Waypoint_C", 9),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-10f, 16f),
+                            new Vector2(-10f, 8f),
+                            new Vector2(2f, 8f),
+                            new Vector2(2f, 16f),
+                            new Vector2(18f, 16f),
+                            new Vector2(18f, -4f),
+                            new Vector2(26f, -4f),
+                            new Vector2(26f, -12f),
+                            new Vector2(30f, -12f)
+                        }
+                    }
+                };
+
+                DefenseBlueprint[] defenses =
+                {
+                    new DefenseBlueprint
+                    {
+                        ObjectName = "DefensePoint_Core",
+                        PointId = "Core",
+                        DisplayName = "Core Defense Point",
+                        Position = new Vector2(30f, -12f)
+                    }
+                };
+
+                ApplyBlueprintIntoScene(
+                    scene,
+                    map,
+                    buildZone,
+                    pathVisualsRoot,
+                    routes,
+                    defenses,
+                    relayLimit: 7);
+
+                EditorSceneManager.SaveScene(scene);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        private static void ApplyLevel04ExpandedBlueprint()
+        {
+            Scene scene = EditorSceneManager.OpenScene(Level04ScenePath, OpenSceneMode.Single);
+            try
+            {
+                BattlefieldMapDefinition map = FindRequiredComponent<BattlefieldMapDefinition>(scene, BattlefieldMapName);
+                BuildZone buildZone = FindRequiredComponent<BuildZone>(scene, BuildZoneName);
+                Transform pathVisualsRoot = FindRequiredTransform(scene, PathVisualsName);
+                Camera mainCamera = FindRequiredComponent<Camera>(scene, MainCameraName);
+
+                // The new Level04 target is intentionally huge.
+                // The user asked for roughly double the map area plus more route curvature,
+                // so both the build zone and the camera framing must grow with the route plan.
+                buildZone.transform.localScale = new Vector3(140f, 84f, 1f);
+                mainCamera.orthographicSize = 22f;
+
+                RouteBlueprint[] routes =
+                {
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_Main",
+                        GateId = "Gate_A",
+                        GateDisplayName = "North Outer Spawn Gate",
+                        PathObjectName = "EnemyPath",
+                        DefensePointObjectName = "DefensePoint_Alpha",
+                        WaypointNames = BuildWaypointNames("Waypoint_", 11),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-50f, 24f),
+                            new Vector2(-36f, 24f),
+                            new Vector2(-36f, 10f),
+                            new Vector2(-20f, 10f),
+                            new Vector2(-20f, 20f),
+                            new Vector2(-4f, 20f),
+                            new Vector2(-4f, 8f),
+                            new Vector2(14f, 8f),
+                            new Vector2(14f, 14f),
+                            new Vector2(30f, 14f),
+                            new Vector2(46f, 14f)
+                        }
+                    },
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_Mid",
+                        GateId = "Gate_B",
+                        GateDisplayName = "Upper Exchange Spawn Gate",
+                        PathObjectName = "EnemyPath_C",
+                        DefensePointObjectName = "DefensePoint_Alpha",
+                        WaypointNames = BuildWaypointNames("Waypoint_C", 9),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-12f, 28f),
+                            new Vector2(-12f, 16f),
+                            new Vector2(0f, 16f),
+                            new Vector2(0f, 4f),
+                            new Vector2(18f, 4f),
+                            new Vector2(18f, 10f),
+                            new Vector2(28f, 10f),
+                            new Vector2(28f, 14f),
+                            new Vector2(46f, 14f)
+                        }
+                    },
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_Alt",
+                        GateId = "Gate_C",
+                        GateDisplayName = "South Outer Spawn Gate",
+                        PathObjectName = "EnemyPath_B",
+                        DefensePointObjectName = "DefensePoint_Beta",
+                        WaypointNames = BuildWaypointNames("Waypoint_B", 11),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-50f, -24f),
+                            new Vector2(-36f, -24f),
+                            new Vector2(-36f, -10f),
+                            new Vector2(-20f, -10f),
+                            new Vector2(-20f, -20f),
+                            new Vector2(-4f, -20f),
+                            new Vector2(-4f, -8f),
+                            new Vector2(14f, -8f),
+                            new Vector2(14f, -14f),
+                            new Vector2(30f, -14f),
+                            new Vector2(46f, -14f)
+                        }
+                    },
+                    new RouteBlueprint
+                    {
+                        GateObjectName = "SpawnGate_LowerMid",
+                        GateId = "Gate_D",
+                        GateDisplayName = "Lower Exchange Spawn Gate",
+                        PathObjectName = "EnemyPath_D",
+                        DefensePointObjectName = "DefensePoint_Beta",
+                        WaypointNames = BuildWaypointNames("Waypoint_D", 9),
+                        Waypoints = new[]
+                        {
+                            new Vector2(-12f, -28f),
+                            new Vector2(-12f, -16f),
+                            new Vector2(0f, -16f),
+                            new Vector2(0f, -4f),
+                            new Vector2(18f, -4f),
+                            new Vector2(18f, -10f),
+                            new Vector2(28f, -10f),
+                            new Vector2(28f, -14f),
+                            new Vector2(46f, -14f)
+                        }
+                    }
+                };
+
+                DefenseBlueprint[] defenses =
+                {
+                    new DefenseBlueprint
+                    {
+                        ObjectName = "DefensePoint_Alpha",
+                        PointId = "Alpha",
+                        DisplayName = "Upper Core",
+                        Position = new Vector2(46f, 14f)
+                    },
+                    new DefenseBlueprint
+                    {
+                        ObjectName = "DefensePoint_Beta",
+                        PointId = "Beta",
+                        DisplayName = "Lower Core",
+                        Position = new Vector2(46f, -14f)
+                    }
+                };
+
+                ApplyBlueprintIntoScene(
+                    scene,
+                    map,
+                    buildZone,
+                    pathVisualsRoot,
+                    routes,
+                    defenses,
+                    relayLimit: 8);
+
+                EditorSceneManager.SaveScene(scene);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        /// <summary>
+        /// Applies one whole scene blueprint.
+        ///
+        /// This method deliberately works in a top-down order:
+        /// 1. defense points
+        /// 2. enemy paths
+        /// 3. spawn gates
+        /// 4. road strips
+        /// 5. map reference collection
+        ///
+        /// That order keeps cross-references easy to wire because each later step can safely
+        /// look up the scene objects created or renamed by the previous step.
+        /// </summary>
+        private static void ApplyBlueprintIntoScene(
+            Scene scene,
+            BattlefieldMapDefinition map,
+            BuildZone buildZone,
+            Transform pathVisualsRoot,
+            IReadOnlyList<RouteBlueprint> routes,
+            IReadOnlyList<DefenseBlueprint> defenses,
+            int relayLimit)
+        {
+            Transform mapRoot = map.transform;
+
+            Dictionary<string, DefensePointFlag> defenseByName = new Dictionary<string, DefensePointFlag>();
+            DefensePointFlag defenseTemplate = FindFirstComponentInScene<DefensePointFlag>(scene);
+            foreach (DefenseBlueprint defenseBlueprint in defenses)
+            {
+                DefensePointFlag defensePoint = GetOrDuplicateDefensePoint(defenseTemplate, mapRoot, defenseBlueprint.ObjectName);
+                ConfigureDefensePoint(defensePoint, defenseBlueprint);
+                defenseByName[defenseBlueprint.ObjectName] = defensePoint;
+            }
+
+            EnemyPath pathTemplate = FindFirstComponentInScene<EnemyPath>(scene);
+            Dictionary<string, EnemyPath> pathByName = new Dictionary<string, EnemyPath>();
+            foreach (RouteBlueprint route in routes)
+            {
+                EnemyPath enemyPath = GetOrDuplicateEnemyPath(pathTemplate, mapRoot, route.PathObjectName);
+                ConfigureEnemyPath(enemyPath, route.WaypointNames, route.Waypoints);
+                pathByName[route.PathObjectName] = enemyPath;
+            }
+
+            EnemySpawnGate gateTemplate = FindFirstComponentInScene<EnemySpawnGate>(scene);
+            foreach (RouteBlueprint route in routes)
+            {
+                EnemySpawnGate spawnGate = GetOrDuplicateSpawnGate(gateTemplate, mapRoot, route.GateObjectName);
+                ConfigureSpawnGate(
+                    spawnGate,
+                    route,
+                    pathByName[route.PathObjectName],
+                    defenseByName[route.DefensePointObjectName]);
+            }
+
+            CleanupExtraComponents(mapRoot, routes, defenses);
+            RebuildRoadSegmentsFromRoutes(pathVisualsRoot, routes);
+
+            // Keep the authored relay cap in sync with the intended difficulty spike.
+            SerializedObject serializedMap = new SerializedObject(map);
+            SerializedProperty relayLimitProperty = serializedMap.FindProperty("relayLimit");
+            if (relayLimitProperty != null)
+            {
+                relayLimitProperty.intValue = relayLimit;
+                serializedMap.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            map.CollectSceneReferences();
+            EditorUtility.SetDirty(map);
+            EditorUtility.SetDirty(buildZone);
+            EditorSceneManager.MarkSceneDirty(scene);
+        }
+
+        /// <summary>
+        /// Removes outdated authored objects that are no longer part of the active blueprint.
+        ///
+        /// This is important when a late-stage map redesign changes the number of
+        /// gates / paths / defense points. Without cleanup, the scene can technically run,
+        /// but it stops matching the intended difficulty contract and becomes confusing to edit.
+        /// </summary>
+        private static void CleanupExtraComponents(
+            Transform mapRoot,
+            IReadOnlyList<RouteBlueprint> routes,
+            IReadOnlyList<DefenseBlueprint> defenses)
+        {
+            HashSet<string> allowedGateNames = new HashSet<string>(routes.Select(route => route.GateObjectName));
+            HashSet<string> allowedPathNames = new HashSet<string>(routes.Select(route => route.PathObjectName));
+            HashSet<string> allowedDefenseNames = new HashSet<string>(defenses.Select(defense => defense.ObjectName));
+
+            List<EnemySpawnGate> extraGates = mapRoot.GetComponentsInChildren<EnemySpawnGate>(true)
+                .Where(gate => gate != null && !allowedGateNames.Contains(gate.name))
+                .ToList();
+            foreach (EnemySpawnGate extraGate in extraGates)
+            {
+                Object.DestroyImmediate(extraGate.gameObject);
+            }
+
+            List<EnemyPath> extraPaths = mapRoot.GetComponentsInChildren<EnemyPath>(true)
+                .Where(path => path != null && !allowedPathNames.Contains(path.name))
+                .ToList();
+            foreach (EnemyPath extraPath in extraPaths)
+            {
+                Object.DestroyImmediate(extraPath.gameObject);
+            }
+
+            List<DefensePointFlag> extraDefensePoints = mapRoot.GetComponentsInChildren<DefensePointFlag>(true)
+                .Where(point => point != null && !allowedDefenseNames.Contains(point.name))
+                .ToList();
+            foreach (DefensePointFlag extraDefensePoint in extraDefensePoints)
+            {
+                Object.DestroyImmediate(extraDefensePoint.gameObject);
+            }
+        }
+
+        private static void ConfigureDefensePoint(DefensePointFlag defensePoint, DefenseBlueprint blueprint)
+        {
+            defensePoint.name = blueprint.ObjectName;
+            defensePoint.transform.SetParent(defensePoint.transform.parent, false);
+            defensePoint.transform.localPosition = new Vector3(blueprint.Position.x, blueprint.Position.y, 0f);
+            defensePoint.transform.localRotation = Quaternion.identity;
+            defensePoint.transform.localScale = Vector3.one;
+
+            SerializedObject serializedDefense = new SerializedObject(defensePoint);
+            SetStringProperty(serializedDefense, "pointId", blueprint.PointId);
+            SetStringProperty(serializedDefense, "displayName", blueprint.DisplayName);
+            serializedDefense.ApplyModifiedPropertiesWithoutUndo();
+
+            defensePoint.EditorRefreshAuthoringState();
+            EditorUtility.SetDirty(defensePoint);
+        }
+
+        private static void ConfigureSpawnGate(
+            EnemySpawnGate spawnGate,
+            RouteBlueprint route,
+            EnemyPath path,
+            DefensePointFlag defensePoint)
+        {
+            spawnGate.name = route.GateObjectName;
+            spawnGate.transform.localPosition = new Vector3(route.Waypoints[0].x, route.Waypoints[0].y, 0f);
+            spawnGate.transform.localRotation = Quaternion.identity;
+            spawnGate.transform.localScale = Vector3.one;
+
+            SerializedObject serializedGate = new SerializedObject(spawnGate);
+            SetStringProperty(serializedGate, "gateId", route.GateId);
+            SetStringProperty(serializedGate, "displayName", route.GateDisplayName);
+            SetObjectProperty(serializedGate, "enemyPathReference", path);
+            SetObjectProperty(serializedGate, "targetDefensePointReference", defensePoint);
+            serializedGate.ApplyModifiedPropertiesWithoutUndo();
+
+            spawnGate.EditorRefreshAuthoringState();
+            EditorUtility.SetDirty(spawnGate);
+        }
+
+        private static void ConfigureEnemyPath(EnemyPath enemyPath, IReadOnlyList<string> waypointNames, IReadOnlyList<Vector2> waypoints)
+        {
+            enemyPath.transform.localPosition = Vector3.zero;
+            enemyPath.transform.localRotation = Quaternion.identity;
+            enemyPath.transform.localScale = Vector3.one;
+
+            List<Transform> childrenToDelete = enemyPath.transform.Cast<Transform>()
+                .Where(child => child != null && !child.name.StartsWith("__", StringComparison.Ordinal))
+                .ToList();
+            foreach (Transform child in childrenToDelete)
+            {
+                Object.DestroyImmediate(child.gameObject);
+            }
+
+            SerializedObject serializedPath = new SerializedObject(enemyPath);
+            SerializedProperty waypointRootProperty = serializedPath.FindProperty("waypointRootReference");
+            if (waypointRootProperty != null)
+            {
+                waypointRootProperty.objectReferenceValue = null;
+                serializedPath.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            for (int index = 0; index < waypoints.Count; index++)
+            {
+                GameObject waypointObject = new GameObject(waypointNames[index]);
+                waypointObject.transform.SetParent(enemyPath.transform, false);
+                waypointObject.transform.localPosition = new Vector3(waypoints[index].x, waypoints[index].y, 0f);
+                waypointObject.transform.localRotation = Quaternion.identity;
+                waypointObject.transform.localScale = Vector3.one;
+            }
+
+            enemyPath.EditorRefreshAuthoringState();
+            EditorUtility.SetDirty(enemyPath);
+        }
+
+        private static void RebuildRoadSegmentsFromRoutes(Transform pathVisualsRoot, IReadOnlyList<RouteBlueprint> routes)
+        {
+            GameObject template = BuildRoadTemplate(pathVisualsRoot);
+
+            List<GameObject> existingSegments = pathVisualsRoot.Cast<Transform>()
+                .Where(child => child != null && child.name.StartsWith("PathSegment_", StringComparison.Ordinal))
+                .Select(child => child.gameObject)
+                .ToList();
+            foreach (GameObject existingSegment in existingSegments)
+            {
+                Object.DestroyImmediate(existingSegment);
+            }
+
+            int segmentCounter = 1;
+            foreach (RouteBlueprint route in routes)
+            {
+                for (int index = 0; index < route.Waypoints.Length - 1; index++)
+                {
+                    Vector2 start = route.Waypoints[index];
+                    Vector2 end = route.Waypoints[index + 1];
+                    CreateRoadSegment(pathVisualsRoot, template, $"PathSegment_{route.GateId}_{segmentCounter:D2}", start, end);
+                    segmentCounter++;
+                }
+            }
+
+            Object.DestroyImmediate(template);
+        }
+
+        private static GameObject BuildRoadTemplate(Transform pathVisualsRoot)
+        {
+            GameObject existingTemplate = pathVisualsRoot.Cast<Transform>()
+                .Where(child => child != null && child.name.StartsWith("PathSegment_", StringComparison.Ordinal))
+                .Select(child => child.gameObject)
+                .FirstOrDefault();
+            if (existingTemplate == null)
+            {
+                throw new InvalidOperationException("No existing PathSegment_ template was found in the scene.");
+            }
+
+            GameObject template = Object.Instantiate(existingTemplate);
+            template.hideFlags = HideFlags.HideAndDontSave;
+            return template;
+        }
+
+        private static void CreateRoadSegment(Transform parent, GameObject template, string objectName, Vector2 start, Vector2 end)
+        {
+            GameObject segmentObject = Object.Instantiate(template, parent);
+            segmentObject.hideFlags = HideFlags.None;
+            segmentObject.name = objectName;
+
+            bool horizontal = Mathf.Abs(start.y - end.y) <= 0.001f;
+            float thickness = 1.8f;
+            float length = horizontal ? Mathf.Abs(end.x - start.x) : Mathf.Abs(end.y - start.y);
+
+            segmentObject.transform.localPosition = horizontal
+                ? new Vector3((start.x + end.x) * 0.5f, start.y, 0f)
+                : new Vector3(start.x, (start.y + end.y) * 0.5f, 0f);
+            segmentObject.transform.localRotation = Quaternion.identity;
+            segmentObject.transform.localScale = horizontal
+                ? new Vector3(length + thickness, thickness, 1f)
+                : new Vector3(thickness, length + thickness, 1f);
+        }
+
+        private static EnemyPath GetOrDuplicateEnemyPath(EnemyPath template, Transform parent, string objectName)
+        {
+            EnemyPath existing = parent.GetComponentsInChildren<EnemyPath>(true).FirstOrDefault(path => path != null && path.name == objectName);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            EnemyPath duplicated = Object.Instantiate(template, parent);
+            duplicated.name = objectName;
+            return duplicated;
+        }
+
+        private static EnemySpawnGate GetOrDuplicateSpawnGate(EnemySpawnGate template, Transform parent, string objectName)
+        {
+            EnemySpawnGate existing = parent.GetComponentsInChildren<EnemySpawnGate>(true).FirstOrDefault(gate => gate != null && gate.name == objectName);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            EnemySpawnGate duplicated = Object.Instantiate(template, parent);
+            duplicated.name = objectName;
+            return duplicated;
+        }
+
+        private static DefensePointFlag GetOrDuplicateDefensePoint(DefensePointFlag template, Transform parent, string objectName)
+        {
+            DefensePointFlag existing = parent.GetComponentsInChildren<DefensePointFlag>(true).FirstOrDefault(point => point != null && point.name == objectName);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            DefensePointFlag duplicated = Object.Instantiate(template, parent);
+            duplicated.name = objectName;
+            return duplicated;
+        }
+
+        private static T FindRequiredComponent<T>(Scene scene, string objectName) where T : Component
+        {
+            T component = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<T>(true))
+                .FirstOrDefault(candidate => candidate != null && candidate.gameObject.name == objectName);
+            if (component == null)
+            {
+                throw new InvalidOperationException($"Required component '{typeof(T).Name}' on object '{objectName}' was not found in scene '{scene.path}'.");
+            }
+
+            return component;
+        }
+
+        private static Transform FindRequiredTransform(Scene scene, string objectName)
+        {
+            Transform transform = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<Transform>(true))
+                .FirstOrDefault(candidate => candidate != null && candidate.name == objectName);
+            if (transform == null)
+            {
+                throw new InvalidOperationException($"Required object '{objectName}' was not found in scene '{scene.path}'.");
+            }
+
+            return transform;
+        }
+
+        private static T FindFirstComponentInScene<T>(Scene scene) where T : Component
+        {
+            return scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<T>(true))
+                .FirstOrDefault(candidate => candidate != null);
+        }
+
+        private static void SetStringProperty(SerializedObject serializedObject, string propertyName, string value)
+        {
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property != null)
+            {
+                property.stringValue = value;
+            }
+        }
+
+        private static void SetObjectProperty(SerializedObject serializedObject, string propertyName, UnityEngine.Object value)
+        {
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property != null)
+            {
+                property.objectReferenceValue = value;
+            }
+        }
+
+        private static string[] BuildWaypointNames(string prefix, int count)
+        {
+            string safePrefix = prefix ?? "Waypoint_";
+            string[] results = new string[count];
+            for (int index = 0; index < count; index++)
+            {
+                if (safePrefix.EndsWith("_", StringComparison.Ordinal))
+                {
+                    results[index] = $"{safePrefix}{index + 1:D2}";
+                }
+                else
+                {
+                    results[index] = $"{safePrefix}{index + 1:D2}";
+                }
+            }
+
+            return results;
+        }
+    }
+}
