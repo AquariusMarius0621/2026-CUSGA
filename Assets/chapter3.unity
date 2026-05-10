@@ -689,6 +689,11 @@ MonoBehaviour:
   bubbleMaxWidth: 7.2
   bubbleMinWidth: 2
   bubbleMinHeight: 1.2
+  useScreenBottomLayout: 0
+  bottomBubbleSize: {x: 1280, y: 220}
+  bottomBubbleOffset: {x: 0, y: 120}
+  bottomBubbleAlpha: 0.6
+  hideBubbleTailInBottomLayout: 1
   mouseButton: 0
   advanceKey: 101
   mouseButtonOnlyAdvance: 1
@@ -728,8 +733,8 @@ MonoBehaviour:
   chenMoveSpeed: 3.5
   offscreenMarginWorld: 2.5
   nextSceneName: chapter3
-  fadeOutToBlackDuration: 0.75
-  fadeInFromBlackDuration: 0.75
+  fadeOutToBlackDuration: 1.2
+  fadeInFromBlackDuration: 1.2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

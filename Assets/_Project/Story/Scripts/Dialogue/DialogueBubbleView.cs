@@ -60,6 +60,10 @@ public sealed class DialogueBubbleView : MonoBehaviour
     private float shakeMag;
     private Vector3 shake;
     private Vector3 contentBaseLocalPos = Vector3.zero;
+    private bool useScreenBottomLayout;
+    private Vector2 screenBottomSize = new Vector2(1280f, 220f);
+    private Vector2 screenBottomOffset = new Vector2(0f, 120f);
+    private float screenBottomAlpha = 0.6f;
 
     private bool _built;
     private Coroutine _imageRefreshRoutine;
@@ -82,6 +86,23 @@ public sealed class DialogueBubbleView : MonoBehaviour
         {
             lineText.font = f;
         }
+    }
+
+    public void SetBottomScreenLayout(bool enabled, Vector2 size, Vector2 offset, float alpha, bool hideTail)
+    {
+        useScreenBottomLayout = enabled;
+        screenBottomSize = size;
+        screenBottomOffset = offset;
+        screenBottomAlpha = Mathf.Clamp01(alpha);
+        showTail = !hideTail;
+
+        if (!_built)
+        {
+            return;
+        }
+
+        ApplyBottomScreenLayout();
+        ApplyTailLayout();
     }
 
     /// <summary>是否绘制尾巴（小三角）。关闭后仅保留矩形气泡与文本。</summary>
@@ -224,7 +245,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
     public void SetFollow(Transform t)
     {
         follow = t;
-        if (enabled && follow != null)
+        if (enabled && follow != null && !useScreenBottomLayout)
         {
             UpdateFollowPosition();
         }
@@ -259,6 +280,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
         ApplyBackgroundFill();
         ApplyImageSlicedSettings();
         ApplyTailSetup();
+        ApplyBottomScreenLayout();
         bubbleBaseLocalScale = bubbleFrame != null ? bubbleFrame.localScale : Vector3.one;
         _built = true;
     }
@@ -377,24 +399,31 @@ public sealed class DialogueBubbleView : MonoBehaviour
             return;
         }
 
-        float innerW = Mathf.Max(0.1f, maxBubbleWidth - contentPadding.x * 2f);
-        Vector2 pref = lineText.GetPreferredValues(full, innerW, 0f);
-        float requiredMinW = minBubbleWidth;
-        float requiredMinH = minBubbleHeight;
-        if (backgroundImageType == Image.Type.Sliced && backgroundImage != null && backgroundImage.sprite != null)
+        if (useScreenBottomLayout)
         {
-            // Sliced 时，Rect 不能小于 Border 四边之和，否则中心区为负，可能直接不绘制。
-            Vector4 b = backgroundImage.sprite.border; // L,B,R,T (pixels)
-            float effPpu = Mathf.Max(0.01f, backgroundImage.sprite.pixelsPerUnit * Mathf.Max(0.01f, imagePixelsPerUnitMultiplier));
-            float minWFromBorder = (b.x + b.z) / effPpu + 0.01f;
-            float minHFromBorder = (b.y + b.w) / effPpu + 0.01f;
-            requiredMinW = Mathf.Max(requiredMinW, minWFromBorder);
-            requiredMinH = Mathf.Max(requiredMinH, minHFromBorder);
+            bubbleFrame.sizeDelta = screenBottomSize;
         }
+        else
+        {
+            float innerW = Mathf.Max(0.1f, maxBubbleWidth - contentPadding.x * 2f);
+            Vector2 pref = lineText.GetPreferredValues(full, innerW, 0f);
+            float requiredMinW = minBubbleWidth;
+            float requiredMinH = minBubbleHeight;
+            if (backgroundImageType == Image.Type.Sliced && backgroundImage != null && backgroundImage.sprite != null)
+            {
+                // Sliced 时，Rect 不能小于 Border 四边之和，否则中心区为负，可能直接不绘制。
+                Vector4 b = backgroundImage.sprite.border; // L,B,R,T (pixels)
+                float effPpu = Mathf.Max(0.01f, backgroundImage.sprite.pixelsPerUnit * Mathf.Max(0.01f, imagePixelsPerUnitMultiplier));
+                float minWFromBorder = (b.x + b.z) / effPpu + 0.01f;
+                float minHFromBorder = (b.y + b.w) / effPpu + 0.01f;
+                requiredMinW = Mathf.Max(requiredMinW, minWFromBorder);
+                requiredMinH = Mathf.Max(requiredMinH, minHFromBorder);
+            }
 
-        float w = Mathf.Clamp(pref.x + contentPadding.x * 2f, requiredMinW, maxBubbleWidth);
-        float h = Mathf.Max(pref.y + contentPadding.y * 2f, requiredMinH);
-        bubbleFrame.sizeDelta = new Vector2(w, h);
+            float w = Mathf.Clamp(pref.x + contentPadding.x * 2f, requiredMinW, maxBubbleWidth);
+            float h = Mathf.Max(pref.y + contentPadding.y * 2f, requiredMinH);
+            bubbleFrame.sizeDelta = new Vector2(w, h);
+        }
 
         var tr = lineText.rectTransform;
         tr.offsetMin = new Vector2(contentPadding.x, contentPadding.y);
@@ -402,6 +431,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
 
         ApplyBackgroundFill();
         ApplyImageSlicedSettings();
+        ApplyBottomScreenLayout();
         ApplyTailLayout();
         LayoutRebuilder.ForceRebuildLayoutImmediate(bubbleFrame);
         if (rootCanvas != null)
@@ -465,6 +495,13 @@ public sealed class DialogueBubbleView : MonoBehaviour
         bg.offsetMin = Vector2.zero;
         bg.offsetMax = Vector2.zero;
         bg.sizeDelta = Vector2.zero;
+
+        Color color = backgroundImage.color;
+        if (useScreenBottomLayout)
+        {
+            color.a = screenBottomAlpha;
+            backgroundImage.color = color;
+        }
     }
 
     /// <summary>
@@ -586,7 +623,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
 
         bool hasSprite = tailImage != null && (tailSpriteOverride != null || tailImage.sprite != null);
         bool useProcedural = !hasSprite && tailGraphic != null;
-        bool visible = showTail && (hasSprite || useProcedural);
+        bool visible = showTail && !useScreenBottomLayout && (hasSprite || useProcedural);
 
         if (tailImage != null)
         {
@@ -619,7 +656,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
 
     private void ApplyTailScaleCompensation()
     {
-        if (tailRect == null || bubbleFrame == null)
+        if (tailRect == null || bubbleFrame == null || useScreenBottomLayout)
         {
             return;
         }
@@ -636,7 +673,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (follow == null || rootCanvas == null || !rootCanvas.gameObject.activeInHierarchy)
+        if (rootCanvas == null || !rootCanvas.gameObject.activeInHierarchy)
         {
             return;
         }
@@ -653,19 +690,61 @@ public sealed class DialogueBubbleView : MonoBehaviour
             shake = Vector3.zero;
         }
 
-        UpdateFollowPosition();
-        ApplyTailScaleCompensation();
+        if (useScreenBottomLayout)
+        {
+            ApplyBottomScreenLayout();
+        }
+        else
+        {
+            if (follow == null)
+            {
+                return;
+            }
 
-        // 需求：只有 background + text 震动，tail 不震动。
+            UpdateFollowPosition();
+            ApplyTailScaleCompensation();
+
+            if (clampToScreen)
+            {
+                ClampToSafeArea();
+            }
+        }
+
         if (contentRoot != null)
         {
             contentRoot.localPosition = contentBaseLocalPos + shake;
         }
+    }
 
-        if (clampToScreen)
+    private void ApplyBottomScreenLayout()
+    {
+        if (!useScreenBottomLayout || rootCanvas == null || bubbleFrame == null)
         {
-            ClampToSafeArea();
+            return;
         }
+
+        if (rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+        {
+            rootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            rootCanvas.worldCamera = null;
+        }
+
+        RectTransform rootRect = rootCanvas.GetComponent<RectTransform>();
+        if (rootRect != null)
+        {
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+        }
+
+        bubbleFrame.anchorMin = new Vector2(0.5f, 0f);
+        bubbleFrame.anchorMax = new Vector2(0.5f, 0f);
+        bubbleFrame.pivot = new Vector2(0.5f, 0.5f);
+        bubbleFrame.anchoredPosition = screenBottomOffset;
+        bubbleFrame.sizeDelta = screenBottomSize;
+        bubbleFrame.localRotation = Quaternion.identity;
+        bubbleFrame.localScale = bubbleBaseLocalScale;
     }
 
     private void UpdateFollowPosition()

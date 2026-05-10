@@ -19,10 +19,17 @@ public sealed class DialogueRunner : MonoBehaviour
     [SerializeField] private Vector3 bubbleWorldOffset = new Vector3(0f, 2.05f, 0f);
 
     [SerializeField] private Vector2 bubbleContentPadding = new Vector2(0.55f, 0.35f);
-    [Tooltip("单条对话气泡可分配的最大总宽度，文本在此宽度内自动换行，超过则顶到最宽后换行。")]
+    [Tooltip("单条气泡可分配的最大总宽度，文本在此宽度内自动换行，超过则顶到最宽后换行。")]
     [SerializeField] private float bubbleMaxWidth = 7.2f;
     [SerializeField] private float bubbleMinWidth = 2f;
     [SerializeField] private float bubbleMinHeight = 1.2f;
+
+    [Header("底部固定字幕框")]
+    [SerializeField] private bool useScreenBottomLayout;
+    [SerializeField] private Vector2 bottomBubbleSize = new Vector2(1280f, 220f);
+    [SerializeField] private Vector2 bottomBubbleOffset = new Vector2(0f, 120f);
+    [SerializeField] [Range(0f, 1f)] private float bottomBubbleAlpha = 0.6f;
+    [SerializeField] private bool hideBubbleTailInBottomLayout = true;
 
     [Header("输入")]
     [SerializeField] private int mouseButton = 0;
@@ -71,10 +78,6 @@ public sealed class DialogueRunner : MonoBehaviour
 
     private static DialogueBubbleView TryLoadBubblePrefab()
     {
-        // Optional runtime fallback: place prefab under a Resources folder with one of these paths.
-        // Example: Assets/Resources/DialogueBubble.prefab  -> "DialogueBubble"
-        //          Assets/Resources/Prefabs/DialogueBubble.prefab -> "Prefabs/DialogueBubble"
-        //          Assets/Resources/Dialogue/DialogueBubble.prefab -> "Dialogue/DialogueBubble"
         string[] paths = { "DialogueBubble", "Prefabs/DialogueBubble", "Dialogue/DialogueBubble" };
         foreach (string p in paths)
         {
@@ -203,7 +206,14 @@ public sealed class DialogueRunner : MonoBehaviour
         }
     }
 
-    /// <summary>与 deferFirstLine 配合：排好首句布局并显示空框后，由外部闪框再调用本方法开始打字。</summary>
+    public void HideDialogueBubble()
+    {
+        if (bubble != null)
+        {
+            bubble.Show(false);
+        }
+    }
+
     public void PlayDeferredFirstLine()
     {
         if (!isPlaying || !deferFirstLine || lines.Count == 0 || bubble == null)
@@ -217,11 +227,17 @@ public sealed class DialogueRunner : MonoBehaviour
         bubble.TypeLine(line.text, secondsPerChar, line.emphasis);
     }
 
-    public void HideDialogueBubble()
+    public void ConfigureBottomLayout(bool enabled, Vector2 size, Vector2 offset, float alpha, bool hideTail)
     {
+        useScreenBottomLayout = enabled;
+        bottomBubbleSize = size;
+        bottomBubbleOffset = offset;
+        bottomBubbleAlpha = Mathf.Clamp01(alpha);
+        hideBubbleTailInBottomLayout = hideTail;
+
         if (bubble != null)
         {
-            bubble.Show(false);
+            ApplyBubbleConfig();
         }
     }
 
@@ -232,12 +248,7 @@ public sealed class DialogueRunner : MonoBehaviour
             return;
         }
 
-        Transform t = line.speaker == DialogueSpeaker.Player ? playerAnchor : npcAnchor;
-        if (t == null)
-        {
-            t = interactor != null ? interactor.transform : null;
-        }
-
+        Transform t = ResolveAnchor(line);
         if (t != null)
         {
             bubble.SetFollow(t);
@@ -287,12 +298,24 @@ public sealed class DialogueRunner : MonoBehaviour
 
     private void ApplyBubbleConfig()
     {
+        if (bubble == null)
+        {
+            return;
+        }
+
         bubble.SetLayout(
             bubbleWorldOffset,
             bubbleContentPadding,
             bubbleMaxWidth,
             bubbleMinWidth,
             bubbleMinHeight);
+
+        bubble.SetBottomScreenLayout(
+            useScreenBottomLayout,
+            bottomBubbleSize,
+            bottomBubbleOffset,
+            bottomBubbleAlpha,
+            hideBubbleTailInBottomLayout);
     }
 
     private void ShowLine(DialogueLine line)
@@ -302,12 +325,7 @@ public sealed class DialogueRunner : MonoBehaviour
             return;
         }
 
-        Transform t = line.speaker == DialogueSpeaker.Player ? playerAnchor : npcAnchor;
-        if (t == null)
-        {
-            t = interactor != null ? interactor.transform : null;
-        }
-
+        Transform t = ResolveAnchor(line);
         if (t != null)
         {
             bubble.SetFollow(t);
@@ -317,6 +335,22 @@ public sealed class DialogueRunner : MonoBehaviour
         bubble.Show(true);
         bubble.ClearText();
         bubble.TypeLine(line.text, secondsPerChar, line.emphasis);
+    }
+
+    private Transform ResolveAnchor(DialogueLine line)
+    {
+        if (useScreenBottomLayout)
+        {
+            return null;
+        }
+
+        Transform t = line.speaker == DialogueSpeaker.Player ? playerAnchor : npcAnchor;
+        if (t == null)
+        {
+            t = interactor != null ? interactor.transform : null;
+        }
+
+        return t;
     }
 
     private void Advance()
