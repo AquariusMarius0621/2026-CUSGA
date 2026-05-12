@@ -38,6 +38,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
 
     [Header("尾巴（倒三角 tail）")]
     [SerializeField] private bool showTail = true;
+    private bool hideTailInCurrentBottomLayout;
     [Tooltip("尾巴的宽高（世界空间单位，随 Canvas 缩放）。")]
     [SerializeField] private Vector2 tailSize = new Vector2(0.8f, 0.55f);
     [Tooltip("尾巴相对气泡底部中心的偏移。X: 左右；Y: 往下（正数表示更向下）。")]
@@ -94,7 +95,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
         screenBottomSize = size;
         screenBottomOffset = offset;
         screenBottomAlpha = Mathf.Clamp01(alpha);
-        showTail = !hideTail;
+        hideTailInCurrentBottomLayout = hideTail;
 
         if (!_built)
         {
@@ -279,6 +280,10 @@ public sealed class DialogueBubbleView : MonoBehaviour
         EnsureContentRoot();
         ApplyBackgroundFill();
         ApplyImageSlicedSettings();
+        if (!useScreenBottomLayout)
+        {
+            hideTailInCurrentBottomLayout = false;
+        }
         ApplyTailSetup();
         ApplyBottomScreenLayout();
         bubbleBaseLocalScale = bubbleFrame != null ? bubbleFrame.localScale : Vector3.one;
@@ -384,12 +389,9 @@ public sealed class DialogueBubbleView : MonoBehaviour
             return;
         }
 
-        // 需求：取消放大效果；仅让背景+文本轻微震动。
-        bubbleFrame.localScale = bubbleBaseLocalScale;
-
-        // Reduce shake intensity to be subtler than authored values.
-        const float shakeMultiplier = 0.35f;
-        shakeMag = typing ? Mathf.Max(0f, e.shakeMagnitude) * shakeMultiplier : 0f;
+        float scale = typing ? Mathf.Max(1f, e.scaleMultiplier) : 1f;
+        bubbleFrame.localScale = bubbleBaseLocalScale * scale;
+        shakeMag = typing ? Mathf.Max(0f, e.shakeMagnitude) : 0f;
     }
 
     private void LayoutForFullString(string full)
@@ -621,13 +623,16 @@ public sealed class DialogueBubbleView : MonoBehaviour
             return;
         }
 
-        bool hasSprite = tailImage != null && (tailSpriteOverride != null || tailImage.sprite != null);
-        bool useProcedural = !hasSprite && tailGraphic != null;
-        bool visible = showTail && !useScreenBottomLayout && (hasSprite || useProcedural);
+        bool useImage = tailImage != null;
+        bool useProcedural = !useImage && tailGraphic != null;
+        bool hiddenByBottomLayout = useScreenBottomLayout && hideTailInCurrentBottomLayout;
+        bool visible = showTail && !hiddenByBottomLayout && (useImage || useProcedural);
+
+        tailRect.gameObject.SetActive(visible);
 
         if (tailImage != null)
         {
-            tailImage.enabled = visible && hasSprite;
+            tailImage.enabled = visible;
         }
 
         if (tailGraphic != null)
@@ -640,6 +645,12 @@ public sealed class DialogueBubbleView : MonoBehaviour
             return;
         }
 
+        if (tailImage != null && tailSpriteOverride != null)
+        {
+            tailImage.sprite = tailSpriteOverride;
+        }
+
+        tailRect.SetAsLastSibling();
         tailRect.anchorMin = new Vector2(0.5f, 0f);
         tailRect.anchorMax = new Vector2(0.5f, 0f);
         tailRect.pivot = new Vector2(0.5f, 1f);
