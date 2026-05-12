@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -56,6 +58,11 @@ public sealed class DialogueBubbleView : MonoBehaviour
     private Coroutine typeRoutine;
     private bool isTyping;
     private bool skipType;
+    private bool isPaused;
+    private bool wasPausedByControlTag;
+    private float currentSecondsPerChar;
+    private List<CharAnimationData> charAnimations;
+    private HashSet<int> pauseAtCharIndex;
     private Vector3 bubbleBaseLocalScale = Vector3.one;
     private float shakeMag;
     private Vector3 shake;
@@ -65,6 +72,23 @@ public sealed class DialogueBubbleView : MonoBehaviour
     private Coroutine _imageRefreshRoutine;
 
     public bool IsTyping => isTyping;
+    public bool IsPaused => isPaused;
+    public bool WasPausedByControlTag => wasPausedByControlTag;
+
+    [System.Serializable]
+    public sealed class CharAnimationData
+    {
+        public int charIndex;
+        public float fontSizeScale = 1f;
+        public float speedMultiplier = 1f;
+
+        public CharAnimationData(int index, float sizeScale, float speedMult)
+        {
+            charIndex = index;
+            fontSizeScale = sizeScale;
+            speedMultiplier = speedMult;
+        }
+    }
 
     private void OnDisable()
     {
@@ -289,6 +313,29 @@ public sealed class DialogueBubbleView : MonoBehaviour
         }
     }
 
+    public void SetPaused(bool paused)
+    {
+        isPaused = paused;
+        if (!paused)
+        {
+            wasPausedByControlTag = false;
+        }
+    }
+
+    public void ResumeTyping()
+    {
+        if (isPaused)
+        {
+            isPaused = false;
+            wasPausedByControlTag = false;
+        }
+    }
+
+    public void SetTypingSpeed(float secondsPerChar)
+    {
+        currentSecondsPerChar = Mathf.Max(0f, secondsPerChar);
+    }
+
     public void TypeLine(string content, float secondsPerChar, DialogueEmphasis emphasis)
     {
         BuildIfNeeded();
@@ -304,39 +351,391 @@ public sealed class DialogueBubbleView : MonoBehaviour
         }
 
         ApplyEmphasis(emphasis, true);
-        LayoutForFullString(content ?? string.Empty);
-        typeRoutine = StartCoroutine(TypeRoutine(content ?? string.Empty, secondsPerChar, emphasis));
+        string raw = content ?? string.Empty;
+        string display = StripControlTags(raw);
+
+        charAnimations = ParseCharAnimations(raw);
+        pauseAtCharIndex = ParsePausePoints(raw);
+
+        LayoutForFullString(display);
+        typeRoutine = StartCoroutine(TypeRoutine(raw, display, secondsPerChar, emphasis));
     }
 
-    private IEnumerator TypeRoutine(string full, float secPer, DialogueEmphasis em)
-    {
-        isTyping = true;
-        skipType = false;
-        lineText.text = string.Empty;
+    
+private IEnumerator TypeRoutine(string raw, string display, float secPer, DialogueEmphasis em)
+{
+    isTyping = true;
+    skipType = false;
+    isPaused = false;
 
-        if (string.IsNullOrEmpty(full))
+    float currentSecPer = Mathf.Max(0f, secPer);
+
+    lineText.richText = true;
+    lineText.text = display ?? string.Empty;
+    lineText.maxVisibleCharacters = 0;
+    lineText.ForceMeshUpdate();
+
+    if (string.IsNullOrEmpty(raw))
+    {
+        isTyping = false;
+        ApplyEmphasis(em, false);
+        yield break;
+    }
+
+    int visible = 0;
+    int rawIndex = 0;
+
+    while (rawIndex < raw.Length)
+    {
+        // 点击跳过整句
+        if (skipType)
         {
-            isTyping = false;
-            ApplyEmphasis(em, false);
+            lineText.maxVisibleCharacters = int.MaxValue;
+            break;
+        }
+
+        // pause 状态
+        if (isPaused)
+        {
+            yield return null;
+            continue;
+        }
+
+        // =========================
+        // [pause]
+        // =========================
+        if (MatchLiteral(raw, rawIndex, "[pause]"))
+        {
+            rawIndex += "[pause]".Length;
+            isPaused = true;
+            continue;
+        }
+
+        // =========================
+        // [speed=0.01]
+        // =========================
+        if (MatchLiteral(raw, rawIndex, "[speed="))
+        {
+            int end = raw.IndexOf(']', rawIndex);
+
+            if (end != -1)
+            {
+                string num = raw.Substring(rawIndex + 7, end - rawIndex - 7);
+
+                if (float.TryParse(
+                    num,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out float sp))
+                {
+                    currentSecPer = Mathf.Max(0f, sp);
+                }
+
+                rawIndex = end + 1;
+                continue;
+            }
+        }
+
+        // =========================
+        // TMP RichText 标签
+        // <size=150%>
+        // <color=red>
+        // </size>
+        // =========================
+        if (raw[rawIndex] == '<')
+        {
+            int end = raw.IndexOf('>', rawIndex);
+
+            if (end != -1)
+            {
+                rawIndex = end + 1;
+                continue;
+            }
+        }
+
+        // =========================
+        // 普通字符
+        // =========================
+        visible++;
+        lineText.maxVisibleCharacters = visible;
+
+        rawIndex++;
+
+        if (currentSecPer > 0f)
+        {
+            yield return new WaitForSeconds(currentSecPer);
+        }
+        else
+        {
+            yield return null;
+        }
+    }
+
+    lineText.maxVisibleCharacters = int.MaxValue;
+
+    isTyping = false;
+    skipType = false;
+    isPaused = false;
+    typeRoutine = null;
+
+    ApplyEmphasis(em, false);
+}
+
+
+    private static YieldInstruction WaitSecondsScaled(float seconds)
+    {
+        return seconds <= 0f ? null : new WaitForSeconds(seconds);
+    }
+
+    private static string StripControlTags(string s)
+    {
+        if (string.IsNullOrEmpty(s))
+        {
+            return string.Empty;
+        }
+
+        string result = s;
+        result = Regex.Replace(result, @"\[/?pause\]", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\[/?resume\]", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\[speed=[^\]]*\]", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\[size=[^\]]*\]", "", RegexOptions.IgnoreCase);
+        return result;
+    }
+
+    private static bool MatchLiteral(string s, int index, string lit)
+    {
+        if (index + lit.Length > s.Length)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < lit.Length; i++)
+        {
+            if (s[index + i] != lit[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static HashSet<int> ParsePausePoints(string raw)
+    {
+        var pauses = new HashSet<int>();
+        if (string.IsNullOrEmpty(raw))
+        {
+            return pauses;
+        }
+
+        int rawIndex = 0;
+        int displayIndex = 0;
+        while (rawIndex < raw.Length)
+        {
+            if (raw[rawIndex] == '[')
+            {
+                if (MatchLiteral(raw, rawIndex, "[pause]") || MatchLiteral(raw, rawIndex, "[PAUSE]"))
+                {
+                    pauses.Add(displayIndex);
+                    rawIndex += 7;
+                    continue;
+                }
+
+                if (MatchLiteral(raw, rawIndex, "[resume]") || MatchLiteral(raw, rawIndex, "[RESUME]"))
+                {
+                    rawIndex += 8;
+                    continue;
+                }
+
+                if (MatchLiteral(raw, rawIndex, "[speed=") || MatchLiteral(raw, rawIndex, "[SPEED="))
+                {
+                    int start = rawIndex + 7;
+                    int end = raw.IndexOf(']', start);
+                    if (end > start)
+                    {
+                        rawIndex = end + 1;
+                        continue;
+                    }
+                }
+
+                if (MatchLiteral(raw, rawIndex, "[size=") || MatchLiteral(raw, rawIndex, "[SIZE="))
+                {
+                    int start = rawIndex + 6;
+                    int end = raw.IndexOf(']', start);
+                    if (end > start)
+                    {
+                        rawIndex = end + 1;
+                        continue;
+                    }
+                }
+            }
+
+            if (raw[rawIndex] != '[')
+            {
+                displayIndex++;
+            }
+
+            rawIndex++;
+        }
+
+        return pauses;
+    }
+
+    // Back-compat with requested signature; parsing is precomputed in ParsePausePoints/ParseCharAnimations.
+    private bool TryProcessControlTags(string raw, ref int index, ref float secondsPerChar, int currentVisibleCount)
+    {
+        index = string.IsNullOrEmpty(raw) ? 0 : raw.Length;
+        secondsPerChar = currentSecondsPerChar;
+        return false;
+    }
+
+    private static List<CharAnimationData> ParseCharAnimations(string raw)
+    {
+        var animations = new List<CharAnimationData>();
+        if (string.IsNullOrEmpty(raw))
+        {
+            return animations;
+        }
+
+        int rawIndex = 0;
+        int displayCharCount = 0;
+        float currentSizeScale = 1f;
+        float currentSpeedMult = 1f;
+
+        while (rawIndex < raw.Length)
+        {
+            if (raw[rawIndex] == '[')
+            {
+                if (MatchLiteral(raw, rawIndex, "[size=") || MatchLiteral(raw, rawIndex, "[SIZE="))
+                {
+                    int start = rawIndex + 6;
+                    int end = raw.IndexOf(']', start);
+                    if (end > start)
+                    {
+                        string num = raw.Substring(start, end - start);
+                        if (float.TryParse(
+                                num,
+                                System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                out float sizeScale))
+                        {
+                            currentSizeScale = sizeScale;
+                        }
+
+                        rawIndex = end + 1;
+                        continue;
+                    }
+                }
+                else if (MatchLiteral(raw, rawIndex, "[speed=") || MatchLiteral(raw, rawIndex, "[SPEED="))
+                {
+                    int start = rawIndex + 7;
+                    int end = raw.IndexOf(']', start);
+                    if (end > start)
+                    {
+                        string num = raw.Substring(start, end - start);
+                        if (float.TryParse(
+                                num,
+                                System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                out float speedMult))
+                        {
+                            currentSpeedMult = speedMult;
+                        }
+
+                        rawIndex = end + 1;
+                        continue;
+                    }
+                }
+                else if (MatchLiteral(raw, rawIndex, "[pause]") || MatchLiteral(raw, rawIndex, "[PAUSE]"))
+                {
+                    rawIndex += 7;
+                    continue;
+                }
+                else if (MatchLiteral(raw, rawIndex, "[resume]") || MatchLiteral(raw, rawIndex, "[RESUME]"))
+                {
+                    rawIndex += 8;
+                    continue;
+                }
+            }
+
+            if (raw[rawIndex] != '[')
+            {
+                animations.Add(new CharAnimationData(displayCharCount, currentSizeScale, currentSpeedMult));
+                displayCharCount++;
+            }
+
+            rawIndex++;
+        }
+
+        return animations;
+    }
+
+    private CharAnimationData GetCharAnimation(int charIndex)
+    {
+        if (charAnimations == null || charIndex < 0 || charIndex >= charAnimations.Count)
+        {
+            return null;
+        }
+
+        return charAnimations[charIndex];
+    }
+
+    private IEnumerator AnimateCharSize(int charIndex, float targetScale)
+    {
+        if (lineText == null || lineText.textInfo == null)
+        {
             yield break;
         }
 
-        for (int i = 0; i < full.Length; i++)
+        if (charIndex >= lineText.textInfo.characterCount)
         {
-            if (skipType)
-            {
-                lineText.text = full;
-                break;
-            }
-
-            lineText.text += full[i];
-            yield return new WaitForSeconds(secPer);
+            yield break;
         }
 
-        isTyping = false;
-        skipType = false;
-        typeRoutine = null;
-        ApplyEmphasis(em, false);
+        // We need valid mesh data for this character.
+        lineText.ForceMeshUpdate();
+
+        TMP_CharacterInfo charInfo = lineText.textInfo.characterInfo[charIndex];
+        if (!charInfo.isVisible)
+        {
+            yield break;
+        }
+
+        int materialIndex = charInfo.materialReferenceIndex;
+        int vertexIndex = charInfo.vertexIndex;
+
+        Vector3[] vertices = lineText.textInfo.meshInfo[materialIndex].vertices;
+        Vector3 originalCenter = (vertices[vertexIndex + 0] + vertices[vertexIndex + 2]) / 2f;
+
+        float duration = 0.1f;
+        float elapsed = 0f;
+        float startScale = 1f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = duration <= 0f ? 1f : elapsed / duration;
+            float currentScale = Mathf.Lerp(startScale, targetScale, t);
+
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 vertex = vertices[vertexIndex + i];
+                Vector3 dir = vertex - originalCenter;
+                vertices[vertexIndex + i] = originalCenter + dir * currentScale;
+            }
+
+            lineText.UpdateVertexData(TMP_VertexDataUpdateFlags.Vertices);
+            yield return null;
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            Vector3 vertex = vertices[vertexIndex + i];
+            Vector3 dir = vertex - originalCenter;
+            vertices[vertexIndex + i] = originalCenter + dir * targetScale;
+        }
+
+        lineText.UpdateVertexData(TMP_VertexDataUpdateFlags.Vertices);
     }
 
     public void ApplyEmphasisFromRunner(DialogueEmphasis e, bool typing)

@@ -146,11 +146,60 @@ public sealed class DialogueRunner : MonoBehaviour
 
         if (active != null && active.IsTyping)
         {
+            // If paused (e.g. by [pause]), click resumes; otherwise click skips typing.
+            if (active.IsPaused)
+            {
+                ResumeTyping();
+                return;
+            }
+
             active.SkipTyping();
             return;
         }
 
         Advance();
+    }
+
+    /// <summary>Pause current typing (if playing).</summary>
+    public void PauseTyping()
+    {
+        if (active != null && active.IsTyping && !active.IsPaused)
+        {
+            active.SetPaused(true);
+        }
+    }
+
+    /// <summary>Resume current typing (if paused).</summary>
+    public void ResumeTyping()
+    {
+        if (active != null && active.IsPaused)
+        {
+            active.SetPaused(false);
+            active.ResumeTyping();
+        }
+    }
+
+    public void TogglePauseTyping()
+    {
+        if (active != null && active.IsTyping)
+        {
+            if (active.IsPaused)
+            {
+                ResumeTyping();
+            }
+            else
+            {
+                PauseTyping();
+            }
+        }
+    }
+
+    public void SetTypingSpeed(float secondsPerChar)
+    {
+        if (active != null)
+        {
+            active.SetTypingSpeed(secondsPerChar);
+        }
     }
 
     public void PlayConversation(
