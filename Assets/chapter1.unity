@@ -183,10 +183,10 @@ MonoBehaviour:
   playerBubblePrefab: {fileID: 9191823685866065000, guid: b8d7239750b6adc41866acb1283edf0b, type: 3}
   playerBubbleAnchor: {fileID: 1936338050}
   playerBubbleScreenOffset: {x: -90, y: 0, z: 10}
-  npcTextScreenPosition: {x: 500, y: 100}
+  npcTextScreenPosition: {x: 460, y: 100}
   npcTextSize: {x: 760, y: 240}
   npcTextFontSize: 52
-  npcTextColor: {r: 0, g: 0.9089399, b: 0.9811321, a: 1}
+  npcTextColor: {r: 0.5930738, g: 0.9803955, b: 0.98742133, a: 1}
   npcTextFontStyle: 0
   npcTextAlignment: 4097
   npcSecondsPerCharacter: 0.03
@@ -278,7 +278,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!4 &559114785
@@ -290,8 +290,8 @@ Transform:
   m_GameObject: {fileID: 559114783}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3, y: 1, z: 0}
-  m_LocalScale: {x: 0.7, y: 1, z: 1}
+  m_LocalPosition: {x: 4.172, y: 0.883, z: 0}
+  m_LocalScale: {x: 0.45840576, y: 0.27699465, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -640,7 +640,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 500, y: 100}
+  m_AnchoredPosition: {x: 460, y: 100}
   m_SizeDelta: {x: 760, y: 240}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!225 &2122631578
@@ -685,7 +685,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 0, g: 0.9089399, b: 0.9811321, a: 1}
+  m_fontColor: {r: 0.5930738, g: 0.9803955, b: 0.98742133, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

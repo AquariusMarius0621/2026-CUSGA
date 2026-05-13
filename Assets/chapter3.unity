@@ -197,8 +197,8 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.31, y: 2.73}
-    newSize: {x: 1, y: 2}
+    oldSize: {x: 3.2638297, y: 3.2638297}
+    newSize: {x: 3.2638297, y: 3.2638297}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
@@ -246,13 +246,13 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: -1602083477, guid: a1596fe173e3bc04e9dcc7f52f554b12, type: 3}
+  m_SortingOrder: 2
+  m_Sprite: {fileID: 21300000, guid: fce32e4c2667ab6438a26d9443b07987, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 2}
+  m_Size: {x: 3.2638297, y: 3.2638297}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -422,6 +422,7 @@ GameObject:
   - component: {fileID: 323238205}
   - component: {fileID: 323238204}
   - component: {fileID: 323238203}
+  - component: {fileID: 323238208}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -571,6 +572,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &323238208
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 323238202}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 8cf038221e33b904db0ef501af50ac89, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &625510168
 GameObject:
   m_ObjectHideFlags: 0
@@ -768,17 +790,22 @@ MonoBehaviour:
   chen: {fileID: 122054168}
   chenStopPoint: {fileID: 0}
   chenStopConfig: {fileID: 0}
+  chenSpriteRenderer: {fileID: 0}
   chenAnimator: {fileID: 0}
   chenStopOffsetFromPlayer: {x: -1.25, y: 0}
   chenMoveSpeed: 3.5
   chenArriveEpsilon: 0.04
   chenStartExtraRightBeyondCamera: 0.75
   offscreenMarginWorld: 2.5
-  walkLeftStateName: ChenWalkLeft
-  idleStateName: ChenIdle
-  walkRightStateName: ChenWalkRight
+  chenWalkLeftFrames: []
+  chenWalkRightFrames: []
+  chenIdleSprite: {fileID: 0}
+  chenWalkFramesPerSecond: 8
   playerInteractor: {fileID: 323238203}
-  nextSceneName: chapter3
+  playerExitMoveSpeed: 3.5
+  playerOffscreenMarginWorld: 2.5
+  forceNextSceneToChapter35: 1
+  nextSceneName: chapter3.5
   fadeOutToBlackDuration: 1.2
   fadeInFromBlackDuration: 1.2
 --- !u!1660057539 &9223372036854775807

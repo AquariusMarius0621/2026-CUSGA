@@ -54,6 +54,7 @@ public sealed class DialogueBubbleView : MonoBehaviour
 
     [Header("字体（可空，由 Runner 设置）")]
     [SerializeField] private TMP_FontAsset fontOverride;
+    [SerializeField] private float fontSizeOverride = -1f;
 
     private Transform follow;
     private Coroutine typeRoutine;
@@ -110,6 +111,15 @@ public sealed class DialogueBubbleView : MonoBehaviour
         if (lineText != null && f != null)
         {
             lineText.font = f;
+        }
+    }
+
+    public void SetFontSizeOverride(float size)
+    {
+        fontSizeOverride = size;
+        if (lineText != null && size > 0f)
+        {
+            lineText.fontSize = size;
         }
     }
 
@@ -301,6 +311,11 @@ public sealed class DialogueBubbleView : MonoBehaviour
             lineText.font = fontOverride;
         }
 
+        if (fontSizeOverride > 0f)
+        {
+            lineText.fontSize = fontSizeOverride;
+        }
+
         EnsureContentRoot();
         ApplyBackgroundFill();
         ApplyImageSlicedSettings();
@@ -361,6 +376,32 @@ public sealed class DialogueBubbleView : MonoBehaviour
     public void SetTypingSpeed(float secondsPerChar)
     {
         currentSecondsPerChar = Mathf.Max(0f, secondsPerChar);
+    }
+
+    public void ShowInstantLine(string content, DialogueEmphasis emphasis)
+    {
+        BuildIfNeeded();
+        if (lineText == null)
+        {
+            return;
+        }
+
+        if (typeRoutine != null)
+        {
+            StopCoroutine(typeRoutine);
+            typeRoutine = null;
+        }
+
+        ApplyEmphasis(emphasis, true);
+        string raw = content ?? string.Empty;
+        string display = StripControlTags(raw);
+        LayoutForFullString(display);
+        lineText.richText = true;
+        lineText.text = display;
+        lineText.maxVisibleCharacters = int.MaxValue;
+        isTyping = false;
+        skipType = false;
+        isPaused = false;
     }
 
     public void TypeLine(string content, float secondsPerChar, DialogueEmphasis emphasis)

@@ -6,6 +6,15 @@ using UnityEngine.UI;
 
 public sealed class Chapter1 : MonoBehaviour
 {
+    private enum Chapter1AdvanceStage
+    {
+        None = 0,
+        WaitingNpcOpen = 1,
+        WaitingLineAdvance = 2,
+        WaitingNpcClose = 3,
+        WaitingPlayerStart = 4,
+    }
+
     [Header("字体")]
     [SerializeField] private TMP_FontAsset dialogueFontAsset;
 
@@ -29,6 +38,9 @@ public sealed class Chapter1 : MonoBehaviour
     [SerializeField] private TextAlignmentOptions npcTextAlignment = TextAlignmentOptions.MidlineLeft;
     [SerializeField] private float npcSecondsPerCharacter = 0.03f;
 
+    [Header("Center Bubble")]
+    [SerializeField] private Chapter1CenterBubbleScreen centerBubbleScreen;
+
     [Header("点击推进")]
     [SerializeField] private int mouseButton = 0;
 
@@ -48,18 +60,26 @@ public sealed class Chapter1 : MonoBehaviour
     private Coroutine npcTypingRoutine;
     private bool isNpcTyping;
     private string currentNpcFullText = string.Empty;
+    private DialogueLine pendingPlayerLine;
+    private Chapter1AdvanceStage advanceStage;
 
     private void Awake()
     {
         ApplyDefaultLinesIfNeeded();
         EnsureDialogueRunner();
         EnsurePlayerAnchor();
+        EnsureCenterBubbleScreen();
         EnsureNpcTextUi();
         EnsureAudioSource();
         ApplyFont();
         ApplyNpcTextStyle();
         UpdatePlayerBubbleAnchor();
         HideNpcTextImmediate();
+
+        if (centerBubbleScreen != null)
+        {
+            centerBubbleScreen.SetClosedImmediate();
+        }
     }
 
     private void OnValidate()
@@ -68,6 +88,7 @@ public sealed class Chapter1 : MonoBehaviour
         if (!Application.isPlaying)
         {
             EnsurePlayerAnchor();
+            EnsureCenterBubbleScreen();
             EnsureNpcTextUi();
         }
 
@@ -119,7 +140,7 @@ public sealed class Chapter1 : MonoBehaviour
         }
 
         waitingForAdvanceClick = false;
-        AdvanceDialogue();
+        HandleAdvanceClick();
     }
 
     private void ApplyDefaultLinesIfNeeded()
@@ -156,6 +177,45 @@ public sealed class Chapter1 : MonoBehaviour
         {
             playerBubbleAnchor = CreateChildAnchor("Chapter1PlayerBubbleAnchor");
         }
+    }
+
+    private void EnsureCenterBubbleScreen()
+    {
+        if (centerBubbleScreen != null)
+        {
+            return;
+        }
+
+        centerBubbleScreen = GetComponentInChildren<Chapter1CenterBubbleScreen>(true);
+        if (centerBubbleScreen != null)
+        {
+            return;
+        }
+
+        SpriteRenderer bubbleRenderer = FindCenterBubbleRenderer();
+        if (bubbleRenderer != null)
+        {
+            centerBubbleScreen = bubbleRenderer.GetComponent<Chapter1CenterBubbleScreen>();
+            if (centerBubbleScreen == null)
+            {
+                centerBubbleScreen = bubbleRenderer.gameObject.AddComponent<Chapter1CenterBubbleScreen>();
+            }
+        }
+    }
+
+    private SpriteRenderer FindCenterBubbleRenderer()
+    {
+        SpriteRenderer[] renderers = FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer renderer = renderers[i];
+            if (renderer != null && renderer.gameObject.name == "CenterBubble")
+            {
+                return renderer;
+            }
+        }
+
+        return null;
     }
 
     private Transform CreateChildAnchor(string anchorName)
@@ -292,6 +352,8 @@ public sealed class Chapter1 : MonoBehaviour
         currentLineIndex = -1;
         isConversationActive = lines != null && lines.Count > 0;
         waitingForAdvanceClick = false;
+        advanceStage = Chapter1AdvanceStage.None;
+        pendingPlayerLine = null;
         StopNpcTypingRoutine();
         HideNpcTextImmediate();
 
@@ -300,12 +362,59 @@ public sealed class Chapter1 : MonoBehaviour
             dialogueRunner.HideDialogueBubble();
         }
 
+        if (centerBubbleScreen != null)
+        {
+            centerBubbleScreen.SetClosedImmediate();
+        }
+
         if (!isConversationActive)
         {
             return;
         }
 
         AdvanceDialogue();
+    }
+
+    private void HandleAdvanceClick()
+    {
+        switch (advanceStage)
+        {
+            case Chapter1AdvanceStage.WaitingNpcOpen:
+                if (centerBubbleScreen != null && !centerBubbleScreen.IsTransitioning)
+                {
+                    centerBubbleScreen.PlayOpen(this, () => StartNpcTyping(currentNpcFullText));
+                }
+                else
+                {
+                    StartNpcTyping(currentNpcFullText);
+                }
+                break;
+            case Chapter1AdvanceStage.WaitingNpcClose:
+                if (centerBubbleScreen != null && !centerBubbleScreen.IsTransitioning)
+                {
+                    centerBubbleScreen.PlayClose(this, OnCenterBubbleClosed);
+                }
+                else
+                {
+                    OnCenterBubbleClosed();
+                }
+                break;
+            case Chapter1AdvanceStage.WaitingPlayerStart:
+                if (pendingPlayerLine != null)
+                {
+                    DialogueLine playerLine = pendingPlayerLine;
+                    pendingPlayerLine = null;
+                    PlayPlayerLine(playerLine);
+                }
+                else
+                {
+                    AdvanceDialogue();
+                }
+                break;
+            default:
+                AdvanceDialogue();
+                break;
+        }
     }
 
     private void AdvanceDialogue()
@@ -323,6 +432,7 @@ public sealed class Chapter1 : MonoBehaviour
     private void ShowLine(DialogueLine line)
     {
         waitingForAdvanceClick = false;
+        advanceStage = Chapter1AdvanceStage.None;
 
         if (line.speaker == DialogueSpeaker.NPC)
         {
@@ -332,11 +442,37 @@ public sealed class Chapter1 : MonoBehaviour
                 dialogueRunner.HideDialogueBubble();
             }
 
+            if (currentLineIndex == 0)
+            {
+                waitingForAdvanceClick = true;
+                advanceStage = Chapter1AdvanceStage.WaitingNpcOpen;
+                return;
+            }
+
             StartNpcTyping(line.text);
             return;
         }
 
+        if (currentLineIndex > 0 && lines[currentLineIndex - 1].speaker == DialogueSpeaker.NPC)
+        {
+            pendingPlayerLine = line;
+            HideNpcTextImmediate();
+            waitingForAdvanceClick = true;
+            advanceStage = Chapter1AdvanceStage.WaitingNpcClose;
+            return;
+        }
+
         HideNpcTextImmediate();
+        PlayPlayerLine(line);
+    }
+
+    private void OnPlayerLineFinished()
+    {
+        waitingForAdvanceClick = true;
+    }
+
+    private void PlayPlayerLine(DialogueLine line)
+    {
         if (dialogueRunner != null)
         {
             dialogueRunner.PlayConversation(null, playerBubbleAnchor, null, new List<DialogueLine> { line }, OnPlayerLineFinished);
@@ -347,22 +483,31 @@ public sealed class Chapter1 : MonoBehaviour
         }
     }
 
-    private void OnPlayerLineFinished()
+    private void OnCenterBubbleClosed()
     {
+        advanceStage = Chapter1AdvanceStage.WaitingPlayerStart;
         waitingForAdvanceClick = true;
+        currentNpcFullText = string.Empty;
     }
 
     private void EndDialogue()
     {
         isConversationActive = false;
         waitingForAdvanceClick = false;
+        advanceStage = Chapter1AdvanceStage.None;
         currentLineIndex = -1;
+        pendingPlayerLine = null;
         StopNpcTypingRoutine();
         HideNpcTextImmediate();
 
         if (dialogueRunner != null)
         {
             dialogueRunner.HideDialogueBubble();
+        }
+
+        if (centerBubbleScreen != null)
+        {
+            centerBubbleScreen.SetClosedImmediate();
         }
     }
 
@@ -396,6 +541,7 @@ public sealed class Chapter1 : MonoBehaviour
         {
             isNpcTyping = false;
             waitingForAdvanceClick = true;
+            advanceStage = Chapter1AdvanceStage.WaitingLineAdvance;
             npcTypingRoutine = null;
             yield break;
         }
@@ -412,6 +558,7 @@ public sealed class Chapter1 : MonoBehaviour
 
         isNpcTyping = false;
         waitingForAdvanceClick = true;
+        advanceStage = Chapter1AdvanceStage.WaitingLineAdvance;
         npcTypingRoutine = null;
     }
 
@@ -425,6 +572,7 @@ public sealed class Chapter1 : MonoBehaviour
 
         isNpcTyping = false;
         waitingForAdvanceClick = true;
+        advanceStage = Chapter1AdvanceStage.WaitingLineAdvance;
     }
 
     private void StopNpcTypingRoutine()
